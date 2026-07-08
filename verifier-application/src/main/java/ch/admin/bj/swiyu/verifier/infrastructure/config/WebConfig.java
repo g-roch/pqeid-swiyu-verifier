@@ -10,7 +10,11 @@ public class WebConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
                 // Needed for PERA confluence issuing page
-                .allowedOrigins("https://confluence.bit.admin.ch")
+                .allowedOriginPatterns(
+                        "https://confluence.bit.admin.ch",
+                        "https://*.pqeid.g-roch.ch",
+                        "https://swiyu-admin-ch.github.io"
+                )
                 .allowedMethods("*");
     }
 }
