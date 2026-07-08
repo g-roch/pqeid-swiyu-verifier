@@ -1,0 +1,35 @@
+FROM eclipse-temurin:21-jdk AS build
+WORKDIR /build
+COPY mvnw mvnw.cmd pom.xml ./
+COPY .mvn .mvn
+COPY pgp pgp
+COPY verifier-service/pom.xml verifier-service/pom.xml
+COPY verifier-service/specs verifier-service/specs
+COPY verifier-application/pom.xml verifier-application/pom.xml
+RUN ./mvnw dependency:go-offline -q
+COPY verifier-service/src verifier-service/src
+COPY verifier-application/src verifier-application/src
+RUN ./mvnw --batch-mode clean generate-resources install -DskipTests -q
+
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+EXPOSE 8080
+
+COPY certs/root_ca_vi.crt /certs-app/root_ca_vi.crt
+COPY certs/swiss_gov_e_root01.crt /certs-app/swiss_gov_e_root01.crt
+RUN keytool -importcert -alias root_ca_vi \
+        -file /certs-app/root_ca_vi.crt \
+        -keystore $JAVA_HOME/lib/security/cacerts \
+        -storepass changeit -noprompt && \
+    keytool -importcert -alias swiss_gov_e_root01 \
+        -file /certs-app/swiss_gov_e_root01.crt \
+        -keystore $JAVA_HOME/lib/security/cacerts \
+        -storepass changeit -noprompt
+
+COPY --from=build /build/verifier-application/target/*.jar app.jar
+
+ENTRYPOINT ["java", \
+    "-Duser.timezone=Europe/Zurich", \
+    "-Dfile.encoding=UTF-8", \
+    "-Dspring.config.location=classpath:bootstrap.yml,classpath:application.yml,optional:file:/vault/secrets/database-credentials.yml", \
+    "-jar", "/app/app.jar"]
