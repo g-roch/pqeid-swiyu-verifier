@@ -13,10 +13,10 @@ import ch.admin.bj.swiyu.verifier.domain.vqps.VqpsRepository;
 import ch.admin.bj.swiyu.verifier.service.trustregistry.TrustStatementCacheService;
 import ch.admin.bj.swiyu.verifier.service.trustregistry.TrustStatementValidator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.jwk.MLDSAKey;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -187,9 +187,9 @@ class VerificationControllerTrustStatementIT {
             throws Exception {
 
         // --- arrange: build JWTs with ephemeral key ---
-        ECKey ecKey = new ECKeyGenerator(Curve.P_256).generate();
-        String idTsJwt = buildSignedIdTsJwt(ecKey);
-        String pvaTsJwt = buildSignedPvaTsJwt(ecKey, List.of("last_name", "first_name"));
+        MLDSAKey mldsaKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).generate();
+        String idTsJwt = buildSignedIdTsJwt(mldsaKey);
+        String pvaTsJwt = buildSignedPvaTsJwt(mldsaKey, List.of("last_name", "first_name"));
 
         // --- arrange: stub cache & validator ---
         when(trustStatementCacheService.getIdentityTrustStatement(VERIFIER_DID)).thenReturn(idTsJwt);
@@ -245,9 +245,9 @@ class VerificationControllerTrustStatementIT {
             throws Exception {
 
         // --- arrange: build trust statement JWTs ---
-        ECKey ecKey = new ECKeyGenerator(Curve.P_256).generate();
-        String idTsJwt = buildSignedIdTsJwt(ecKey);
-        String pvaTsJwt = buildSignedPvaTsJwt(ecKey, List.of("last_name", "first_name"));
+        MLDSAKey mldsaKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).generate();
+        String idTsJwt = buildSignedIdTsJwt(mldsaKey);
+        String pvaTsJwt = buildSignedPvaTsJwt(mldsaKey, List.of("last_name", "first_name"));
 
         // --- arrange: build vqPS JWT and persist it in DB ---
         String vqpsJwt = buildSignedVqpsJwt("com.example.test_scope", Instant.now().plus(30, ChronoUnit.DAYS));
@@ -331,10 +331,10 @@ class VerificationControllerTrustStatementIT {
     /**
      * Builds a signed {@code idTS} JWT using the given EC key.
      *
-     * @param ecKey the signing key
+     * @param mldsaKey the signing key
      * @return compact-serialized signed idTS JWT
      */
-    private String buildSignedIdTsJwt(ECKey ecKey) throws Exception {
+    private String buildSignedIdTsJwt(MLDSAKey mldsaKey) throws Exception {
         Instant now = Instant.now();
         SignedJWT idTs = new IdTsBuilder()
                 .withKid(TRUST_REGISTRY_KID)
@@ -345,18 +345,18 @@ class VerificationControllerTrustStatementIT {
                 .withIsStateActor(false)
                 .addRegistryId("UID", "CHE-000.000.000")
                 .build();
-        idTs.sign(new ECDSASigner(ecKey));
+        idTs.sign(new MLDSASigner(mldsaKey));
         return idTs.serialize();
     }
 
     /**
      * Builds a signed {@code pvaTS} JWT authorizing the given fields.
      *
-     * @param ecKey            the signing key
+     * @param mldsaKey            the signing key
      * @param authorizedFields the list of field names the pvaTS covers
      * @return compact-serialized signed pvaTS JWT
      */
-    private String buildSignedPvaTsJwt(ECKey ecKey, List<String> authorizedFields) throws Exception {
+    private String buildSignedPvaTsJwt(MLDSAKey mldsaKey, List<String> authorizedFields) throws Exception {
         Instant now = Instant.now();
         SignedJWT pvaTs = new PvaTsBuilder()
                 .withKid(TRUST_REGISTRY_KID)
@@ -366,7 +366,7 @@ class VerificationControllerTrustStatementIT {
                 .withJti("550e8400-e29b-41d4-a716-446655440000")
                 .withAuthorizedFields(authorizedFields)
                 .build();
-        pvaTs.sign(new ECDSASigner(ecKey));
+        pvaTs.sign(new MLDSASigner(mldsaKey));
         return pvaTs.serialize();
     }
 
@@ -380,7 +380,7 @@ class VerificationControllerTrustStatementIT {
      * @return compact-serialized signed vqPS JWT
      */
     private String buildSignedVqpsJwt(String scope, Instant expiresAt) throws Exception {
-        var ecKey = new ECKeyGenerator(Curve.P_256).keyID("test-vqps-key").generate();
+        var mldsaKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).keyID("test-vqps-key").generate();
 
         Map<String, Object> dcqlQuery = Map.of(
                 "credentials", List.of(Map.of(
@@ -406,7 +406,7 @@ class VerificationControllerTrustStatementIT {
                 .withRequest(scope, dcqlQuery)
                 .build();
 
-        vqpsJwt.sign(new ECDSASigner(ecKey));
+        vqpsJwt.sign(new MLDSASigner(mldsaKey));
         return vqpsJwt.serialize();
     }
 }

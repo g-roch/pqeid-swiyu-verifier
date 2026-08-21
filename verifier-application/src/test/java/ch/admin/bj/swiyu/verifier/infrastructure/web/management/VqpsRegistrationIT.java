@@ -13,9 +13,8 @@ import ch.admin.bj.swiyu.verifier.service.management.fixtures.ApiFixtures;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.AfterEach;
@@ -257,7 +256,7 @@ class VqpsRegistrationIT {
      * Builds a minimal signed JWT to simulate a vqPS returned by the TMS.
      */
     private String buildSignedVqpsJwt(String scope, Instant expiresAt) throws Exception {
-        var ecKey = new ECKeyGenerator(Curve.P_256).keyID("test-key").generate();
+        var mldsaKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).keyID("test-key").generate();
         var claimsSet = new JWTClaimsSet.Builder()
                 .subject("did:example:verifier")
                 .jwtID(UUID.randomUUID().toString())
@@ -265,10 +264,10 @@ class VqpsRegistrationIT {
                 .claim("scope", scope)
                 .build();
         var signedJWT = new SignedJWT(
-                new JWSHeader.Builder(JWSAlgorithm.ES256).keyID("test-key").build(),
+                new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44).keyID("test-key").build(),
                 claimsSet
         );
-        signedJWT.sign(new ECDSASigner(ecKey));
+        signedJWT.sign(new MLDSASigner(mldsaKey));
         return signedJWT.serialize();
     }
 }

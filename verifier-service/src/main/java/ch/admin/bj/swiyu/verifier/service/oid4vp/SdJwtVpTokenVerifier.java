@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
+import com.nimbusds.jose.crypto.MLDSAVerifier;
 import com.nimbusds.jose.crypto.factories.DefaultJWSVerifierFactory;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -55,7 +55,8 @@ public class SdJwtVpTokenVerifier {
     // We have vc+sd-jwt only for legacy reasons (Expand-Migrate-Contract: removal tracked in a separate Contract-phase ticket).
     // Spec: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-sd-jwt-vc-09#name-application-dcsd-jwt
     public static final List<String> SUPPORTED_CREDENTIAL_FORMATS = List.of("vc+sd-jwt", "dc+sd-jwt");
-    public static final List<String> SUPPORTED_JWT_ALGORITHMS = List.of("ES256");
+    // PQEID: ECDSA -> ML-DSA
+    public static final List<String> SUPPORTED_JWT_ALGORITHMS = List.of("ML-DSA-44");
     public static final List<String> SUPPORTED_SDJWT_ALGORITHMS = List.of("sha-256");
     public static final String SDJWT_ALG_CLAIM = "_sd_alg";
 
@@ -213,7 +214,7 @@ public class SdJwtVpTokenVerifier {
 
             validateKeyBindingHeader(keyBindingJWT.getHeader());
 
-            if (!keyBindingJWT.verify(new ECDSAVerifier(keyBinding.toECKey()))) {
+            if (!keyBindingJWT.verify(new MLDSAVerifier(keyBinding.toMLDSAKey()))) {
                 throw credentialError(HOLDER_BINDING_MISMATCH, "Holder Binding provided does not match the one in the credential");
             }
             validateKeyBindingClaims(keyBindingJWT);
@@ -222,7 +223,7 @@ public class SdJwtVpTokenVerifier {
         } catch (ParseException e) {
             throw credentialError(e, HOLDER_BINDING_MISMATCH, "Holder Binding could not be parsed");
         } catch (JOSEException e) {
-            throw credentialError(e, HOLDER_BINDING_MISMATCH, "Failed to verify the holder key binding - only supporting EC Keys");
+            throw credentialError(e, HOLDER_BINDING_MISMATCH, "Failed to verify the holder key binding - only supporting ML-DSA Keys");
         } catch (BadJWTException e) {
             throw credentialError(e, HOLDER_BINDING_MISMATCH, "Holder Binding is not a valid JWT");
         }

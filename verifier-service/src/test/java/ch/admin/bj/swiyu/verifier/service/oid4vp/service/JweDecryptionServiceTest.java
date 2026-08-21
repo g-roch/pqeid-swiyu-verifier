@@ -9,11 +9,10 @@ import ch.admin.bj.swiyu.verifier.domain.management.ResponseSpecification;
 import ch.admin.bj.swiyu.verifier.service.oid4vp.JweDecryptionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.ECDHEncrypter;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.crypto.XWingEncrypter;
+import com.nimbusds.jose.jwk.XWingKey;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.jwk.gen.XWingKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +29,7 @@ import static org.mockito.Mockito.when;
 
 class JweDecryptionServiceTest {
 
-    private static ECKey ecKey;
+    private static XWingKey xwKey;
     private static ObjectMapper objectMapper;
 
     private ApplicationProperties applicationProperties;
@@ -39,7 +38,7 @@ class JweDecryptionServiceTest {
 
     @BeforeAll
     static void init() throws JOSEException {
-        ecKey = new ECKeyGenerator(Curve.P_256).keyID("ad_hoc_generated_testkey").generate();
+        xwKey = new XWingKeyGenerator().keyID("ad_hoc_generated_testkey").generate();
         objectMapper = new ObjectMapper();
     }
 
@@ -62,7 +61,7 @@ class JweDecryptionServiceTest {
                 .toString();
 
         VerificationPresentationUnionDto encryptedUnion = VerificationPresentationUnionDto.builder()
-                .response(jweEncrypt(claims, ecKey))
+                .response(jweEncrypt(claims, xwKey))
                 .build();
 
         VerificationPresentationUnionDto decrypted = jweDecryptionService.decrypt(management, encryptedUnion);
@@ -78,7 +77,7 @@ class JweDecryptionServiceTest {
         Management management = createTestManagementWithPrivateKey();
 
         String claims = new JWTClaimsSet.Builder().claim("foo", "bar").build().toString();
-        String jweWithoutKeyId = jweEncryptWithoutKeyId(claims, ecKey);
+        String jweWithoutKeyId = jweEncryptWithoutKeyId(claims, xwKey);
 
         VerificationPresentationUnionDto encryptedUnion = VerificationPresentationUnionDto.builder()
                 .response(jweWithoutKeyId)
@@ -92,11 +91,11 @@ class JweDecryptionServiceTest {
 
     @Test
     void decrypt_whenDifferentKeyId_thenThrowsIllegalArgumentException() throws JOSEException {
-        ECKey otherEcKey = new ECKeyGenerator(Curve.P_256).keyID("other-key-id").generate();
+        XWingKey otherXwKey = new XWingKeyGenerator().keyID("other-key-id").generate();
         Management management = createTestManagementWithPrivateKey();
 
         String claims = new JWTClaimsSet.Builder().claim("foo", "bar").build().toString();
-        String jweWithOtherKeyId = jweEncrypt(claims, otherEcKey);
+        String jweWithOtherKeyId = jweEncrypt(claims, otherXwKey);
 
         VerificationPresentationUnionDto encryptedUnion = VerificationPresentationUnionDto.builder()
                 .response(jweWithOtherKeyId)
@@ -111,11 +110,11 @@ class JweDecryptionServiceTest {
     @Test
     void decrypt_whenSameKeyIdButDifferentKeyMaterial_thenThrowsIllegalArgumentException() throws JOSEException {
         // Same key ID but different key material than the one stored in management
-        ECKey otherEcKey = new ECKeyGenerator(Curve.P_256).keyID("ad-hoc-generated-testkey").generate();
+        XWingKey otherXwKey = new XWingKeyGenerator().keyID("ad-hoc-generated-testkey").generate();
         Management management = createTestManagementWithPrivateKey();
 
         String claims = new JWTClaimsSet.Builder().claim("foo", "bar").build().toString();
-        String jweWithDifferentMaterial = jweEncrypt(claims, otherEcKey);
+        String jweWithDifferentMaterial = jweEncrypt(claims, otherXwKey);
 
         VerificationPresentationUnionDto encryptedUnion = VerificationPresentationUnionDto.builder()
                 .response(jweWithDifferentMaterial)
@@ -128,7 +127,7 @@ class JweDecryptionServiceTest {
     }
 
     private static Management createTestManagementWithPrivateKey() {
-        JWKSet jwkSet = new JWKSet(ecKey);
+        JWKSet jwkSet = new JWKSet(xwKey);
         return Management.builder()
                 .responseSpecification(
                         ResponseSpecification.builder()
@@ -139,24 +138,24 @@ class JweDecryptionServiceTest {
                 .build();
     }
 
-    private String jweEncrypt(String claims, ECKey key) throws JOSEException {
+    private String jweEncrypt(String claims, XWingKey key) throws JOSEException {
         JWEObject jweObject = new JWEObject(
-                new JWEHeader.Builder(JWEAlgorithm.ECDH_ES, EncryptionMethod.A256GCM)
+                new JWEHeader.Builder(JWEAlgorithm.XWING, EncryptionMethod.A256GCM)
                         .keyID(key.getKeyID())
                         .build(),
                 new Payload(claims)
         );
-        jweObject.encrypt(new ECDHEncrypter(key.toECPublicKey()));
+        jweObject.encrypt(new XWingEncrypter(key));
         return jweObject.serialize();
     }
 
-    private String jweEncryptWithoutKeyId(String claims, ECKey key) throws JOSEException {
+    private String jweEncryptWithoutKeyId(String claims, XWingKey key) throws JOSEException {
         JWEObject jweObject = new JWEObject(
-                new JWEHeader.Builder(JWEAlgorithm.ECDH_ES, EncryptionMethod.A256GCM)
+                new JWEHeader.Builder(JWEAlgorithm.XWING, EncryptionMethod.A256GCM)
                         .build(),
                 new Payload(claims)
         );
-        jweObject.encrypt(new ECDHEncrypter(key.toECPublicKey()));
+        jweObject.encrypt(new XWingEncrypter(key));
         return jweObject.serialize();
     }
 }

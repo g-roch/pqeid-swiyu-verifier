@@ -46,7 +46,7 @@ class TokenStatusListReferenceTest {
     @Test
     void givenMatchingTokenStatusReference_whenVerified_thenSuccess() throws LoadingPublicKeyOfIssuerFailedException, JOSEException {
         when(issuerPublicKeyLoader.loadPublicKey(issuerOfReferencedToken, "TEST_ISSUER_ID#key-1")).thenReturn(
-                emulator.getKey().toECPublicKey()
+                emulator.getKey().toMLDSAKey().toPublicKey()
         );
         var tokenStatusListReference = new TokenStatusListReference(
                 statusListResolverAdapter,
@@ -72,7 +72,7 @@ class TokenStatusListReferenceTest {
         );
 
         when(issuerPublicKeyLoader.loadPublicKey(issuerOfReferencedToken, "TEST_ISSUER_ID#key-1")).thenReturn(
-                emulator.getKey().toECPublicKey()
+                emulator.getKey().toMLDSAKey().toPublicKey()
         );
 
         var tokenStatusListReference = new TokenStatusListReference(
@@ -102,7 +102,7 @@ class TokenStatusListReferenceTest {
         );
 
         when(issuerPublicKeyLoader.loadPublicKey(issuerOfReferencedToken, "TEST_ISSUER_ID#key-1")).thenReturn(
-                emulator.getKey().toECPublicKey()
+                emulator.getKey().toMLDSAKey().toPublicKey()
         );
 
         var tokenStatusListReference = new TokenStatusListReference(
@@ -123,7 +123,7 @@ class TokenStatusListReferenceTest {
     @Test
     void givenRevokedTokenStatusReference_whenVerified_thenThrowsCredentialRevokedException() throws LoadingPublicKeyOfIssuerFailedException, JOSEException {
         when(issuerPublicKeyLoader.loadPublicKey(issuerOfReferencedToken, "TEST_ISSUER_ID#key-1")).thenReturn(
-                emulator.getKey().toECPublicKey()
+                emulator.getKey().toMLDSAKey().toPublicKey()
         );
         // idx=0 is the position in the status list; the value at position 0 is 1 (revoked), according to SPEC_STATUS_LIST
         var tokenStatusListReference = new TokenStatusListReference(

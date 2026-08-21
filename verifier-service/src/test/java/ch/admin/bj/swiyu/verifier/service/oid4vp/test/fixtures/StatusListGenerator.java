@@ -4,8 +4,12 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.ECDSASigner;
+import com.nimbusds.jose.crypto.MLDSASigner;
 import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.MLDSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.experimental.UtilityClass;
@@ -34,7 +38,7 @@ public class StatusListGenerator {
     /**
      * <pre><code>
      * {
-     * "alg": "ES256",
+     * "alg": "ML-DSA-44",
      * "kid": "12",
      * "typ": "statuslist+jwt"
      * }
@@ -50,7 +54,7 @@ public class StatusListGenerator {
      * }
      * </code></pre>
      */
-    public static String createTokenStatusListTokenVerifiableCredential(String statusList, ECKey signingKey, String issuerId, String keyId) throws JOSEException {
+    public static String createTokenStatusListTokenVerifiableCredential(String statusList, JWK signingKey, String issuerId, String keyId) throws JOSEException {
         var claims = JWT_CLAIM_SET_BUILDER
                 .issuer(issuerId)
                 .claim("status_list", new JWTClaimsSet.Builder()
@@ -59,16 +63,16 @@ public class StatusListGenerator {
                         .issueTime(new Date())
                         .build()
                         .toJSONObject()).build();
-        var header = new JWSHeader.Builder(JWSAlgorithm.ES256)
+        var header = new JWSHeader.Builder(algorithmFor(signingKey))
                 .type(new JOSEObjectType("statuslist+jwt"))
                 .keyID(keyId)
                 .build();
         var jwt = new SignedJWT(header, claims);
-        jwt.sign(new ECDSASigner(signingKey));
+        jwt.sign(signerFor(signingKey));
         return jwt.serialize();
     }
 
-    public static String createInvalidTokenStatusListTokenVerifiableCredentialInvalidClaimBits(ECKey signingKey, String issuerId, String keyId) throws JOSEException {
+    public static String createInvalidTokenStatusListTokenVerifiableCredentialInvalidClaimBits(JWK signingKey, String issuerId, String keyId) throws JOSEException {
         var claims = JWT_CLAIM_SET_BUILDER
                 .issuer(issuerId)
                 .claim("status_list", new JWTClaimsSet.Builder()
@@ -77,16 +81,16 @@ public class StatusListGenerator {
                         .issueTime(new Date())
                         .build()
                         .toJSONObject()).build();
-        var header = new JWSHeader.Builder(JWSAlgorithm.ES256)
+        var header = new JWSHeader.Builder(algorithmFor(signingKey))
                 .type(new JOSEObjectType("statuslist+jwt"))
                 .keyID(keyId)
                 .build();
         var jwt = new SignedJWT(header, claims);
-        jwt.sign(new ECDSASigner(signingKey));
+        jwt.sign(signerFor(signingKey));
         return jwt.serialize();
     }
 
-    public static String createInvalidTokenStatusListTokenVerifiableCredentialMissingClaimLst(ECKey signingKey, String issuerId, String keyId) throws JOSEException {
+    public static String createInvalidTokenStatusListTokenVerifiableCredentialMissingClaimLst(JWK signingKey, String issuerId, String keyId) throws JOSEException {
         var claims = JWT_CLAIM_SET_BUILDER
                 .issuer(issuerId)
                 .claim("status_list", new JWTClaimsSet.Builder()
@@ -94,12 +98,31 @@ public class StatusListGenerator {
                         .issueTime(new Date())
                         .build()
                         .toJSONObject()).build();
-        var header = new JWSHeader.Builder(JWSAlgorithm.ES256)
+        var header = new JWSHeader.Builder(algorithmFor(signingKey))
                 .type(new JOSEObjectType("statuslist+jwt"))
                 .keyID(keyId)
                 .build();
         var jwt = new SignedJWT(header, claims);
-        jwt.sign(new ECDSASigner(signingKey));
+        jwt.sign(signerFor(signingKey));
         return jwt.serialize();
+    }
+
+    // PQEID: ECDSA -> ML-DSA. Picks the signer/algorithm based on the concrete key type, same
+    // pattern as SDJWTCredentialMock.
+    private static JWSSigner signerFor(JWK key) throws JOSEException {
+        if (key instanceof MLDSAKey mldsaKey) {
+            return new MLDSASigner(mldsaKey);
+        }
+        if (key instanceof ECKey ecKey) {
+            return new ECDSASigner(ecKey);
+        }
+        throw new IllegalArgumentException("Unsupported key type: " + key.getKeyType());
+    }
+
+    private static JWSAlgorithm algorithmFor(JWK key) {
+        if (key instanceof MLDSAKey) {
+            return JWSAlgorithm.ML_DSA_44;
+        }
+        return JWSAlgorithm.ES256;
     }
 }

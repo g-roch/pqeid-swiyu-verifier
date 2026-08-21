@@ -11,9 +11,8 @@ import ch.admin.bj.swiyu.verifier.dto.management.VerificationPurposeDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
@@ -165,11 +164,11 @@ class VqpsRegistrationServiceTest {
     }
     @Test
     void getOrRegisterVqps_withJwtMissingExpClaim_throwsIllegalStateException() throws Exception {
-        var ecKey = new ECKeyGenerator(Curve.P_256).keyID("test").generate();
+        var mldsaKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).keyID("test").generate();
         var signedJwt = new SignedJWT(
-                new JWSHeader.Builder(JWSAlgorithm.ES256).keyID("test").build(),
+                new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44).keyID("test").build(),
                 new JWTClaimsSet.Builder().subject("test").build());
-        signedJwt.sign(new ECDSASigner(ecKey));
+        signedJwt.sign(new MLDSASigner(mldsaKey));
         VqpsSubmission succeeded = new VqpsSubmission()
                 .id(UUID.randomUUID()).status(VqpsSubmissionStatus.PUBLICATION_SUCCEEDED)
                 .publicationResult(new VqpsPublicationResult().jwt(signedJwt.serialize()));
@@ -195,14 +194,14 @@ class VqpsRegistrationServiceTest {
     }
     private static String buildJwt(Instant expiresAt) {
         try {
-            var ecKey = new ECKeyGenerator(Curve.P_256).keyID("test-key").generate();
+            var mldsaKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).keyID("test-key").generate();
             var signed = new SignedJWT(
-                    new JWSHeader.Builder(JWSAlgorithm.ES256).keyID("test-key").build(),
+                    new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44).keyID("test-key").build(),
                     new JWTClaimsSet.Builder()
                             .jwtID(UUID.randomUUID().toString())
                             .expirationTime(Date.from(expiresAt))
                             .build());
-            signed.sign(new ECDSASigner(ecKey));
+            signed.sign(new MLDSASigner(mldsaKey));
             return signed.serialize();
         } catch (Exception e) {
             throw new RuntimeException(e);

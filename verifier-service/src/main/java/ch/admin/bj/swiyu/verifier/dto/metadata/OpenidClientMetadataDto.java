@@ -50,8 +50,8 @@ public class OpenidClientMetadataDto {
     @JsonProperty(value = "vp_formats_supported", defaultValue =
             """
             "dc+sd-jwt": {
-                    "sd-jwt_alg_values": ["ES256"],
-                    "kb-jwt_alg_values": ["ES256"]
+                    "sd-jwt_alg_values": ["ML-DSA-44"],
+                    "kb-jwt_alg_values": ["ML-DSA-44"]
                   }
             """)
     @Schema(description = """

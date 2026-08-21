@@ -99,7 +99,7 @@ public class RequestObjectDto {
                         "vp_formats": {
                             "jwt_vp": {
                                 "alg": [
-                                    "ES256"
+                                    "ML-DSA-44"
                                 ],
                             }
                         }

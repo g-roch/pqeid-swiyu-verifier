@@ -47,7 +47,7 @@ class OpenIdClientMetadataConfigurationTest {
 
     @Test
     void initOpenIdClientMetadata_withValidMetadata_setsMetadata() throws IOException {
-        String template = "{\"client_id\":\"${VERIFIER_DID}\",\"logo\":\"logo\",\"vp_formats\":{\"jwt_vp\":{\"alg\":[\"ES256\"]}}}";
+        String template = "{\"client_id\":\"${VERIFIER_DID}\",\"logo\":\"logo\",\"vp_formats\":{\"jwt_vp\":{\"alg\":[\"ML-DSA-44\"]}}}";
 
         when(clientMetadataResource.getContentAsString(Charset.defaultCharset())).thenReturn(template);
 

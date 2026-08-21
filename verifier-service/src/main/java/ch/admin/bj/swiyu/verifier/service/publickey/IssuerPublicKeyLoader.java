@@ -103,6 +103,14 @@ public class IssuerPublicKeyLoader {
             throw new IllegalArgumentException("Failed to parse Json Web Key from verification method since no jwk was provided");
         }
         try {
+            // PQEID: known blocker, not fixed here - the `Jwk` dictionary in repos/didresolver's
+            // did_sidekicks.udl (upstream Rust/UniFFI crate, kept unmodified per CLAUDE.md) is
+            // hardcoded to EC/OKP-shaped fields (kty, crv, x, y, ...). An ML-DSA JWK needs a "pub"
+            // field (see AKPJWK.PUBLIC_KEY_PARAMETER in the nimbus fork), which this struct has no
+            // room for - converting it here will never produce a parseable ML-DSA JWK. Resolving
+            // ML-DSA verification methods from real DID documents requires extending the Rust Jwk
+            // struct upstream (or a local fork, mirroring the nimbus-jose-jwt approach) before this
+            // path works end-to-end.
             Map<String, Object> json = objectMapper.convertValue(jwk, new TypeReference<>() {});
             json.put("kid", issuerDid+"#"+jwk.getKid());
             // Create kid as used in swiss-profile-anchor
@@ -121,9 +129,10 @@ public class IssuerPublicKeyLoader {
      */
     private PublicKey parsePublicKeyOfTypeJsonWebKey(Jwk jwk, String issuerDid) throws LoadingPublicKeyOfIssuerFailedException {
         try {
-            return parseJwk(jwk, issuerDid).toECKey().toPublicKey();
+            // PQEID: ECDSA -> ML-DSA
+            return parseJwk(jwk, issuerDid).toMLDSAKey().toPublicKey();
         } catch (JOSEException e) {
-            throw new LoadingPublicKeyOfIssuerFailedException("Failed to cast key to ECKey", e);
+            throw new LoadingPublicKeyOfIssuerFailedException("Failed to cast key to MLDSAKey", e);
         }
     }
 

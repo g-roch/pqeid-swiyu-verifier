@@ -15,8 +15,8 @@ public class ValidJwtValuesValidator implements ConstraintValidator<ValidJwtValu
             return false;
         }
 
-        // Could be more in the future, but for now we only support ES256
-        var validAlgsList = List.of(JWSAlgorithm.ES256);
+        // PQEID: ECDSA -> ML-DSA. Could be more in the future, but for now we only support ML-DSA-44
+        var validAlgsList = List.of(JWSAlgorithm.ML_DSA_44);
 
         var validAlgorithms = new HashSet<>(validAlgsList.stream().map(JWSAlgorithm::getName).toList());
 

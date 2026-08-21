@@ -58,7 +58,8 @@ public class JwtSigningService {
         }
 
         // Build the JAR header with the required swiss profile version indication.
-        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256)
+        // PQEID: ECDSA -> ML-DSA
+        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44)
                 .keyID(verificationMethod)
                 .type(new JOSEObjectType(OAUTH_AUTHZ_REQ_JWT))
                 .customParam(SwissProfileVersions.PROFILE_VERSION_PARAM, SwissProfileVersions.VERIFICATION_PROFILE_VERSION)

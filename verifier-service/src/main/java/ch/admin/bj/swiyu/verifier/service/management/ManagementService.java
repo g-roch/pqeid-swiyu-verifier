@@ -12,9 +12,8 @@ import ch.admin.bj.swiyu.verifier.dto.management.ResponseModeTypeDto;
 import ch.admin.bj.swiyu.verifier.service.vqps.VqpsRegistrationService;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWEAlgorithm;
-import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.jwk.gen.XWingKeyGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -119,11 +118,12 @@ public class ManagementService {
         return responseSpecificationBuilder;
     }
 
+    // PQEID: ECDH-ES -> XWING (post-quantum hybrid KEM, X25519+ML-KEM-768)
     private static void createEncryptionKeys(ResponseSpecification.ResponseSpecificationBuilder responseSpecificationBuilder) {
         try {
-            var ephemeralEncryptionKey = new ECKeyGenerator(Curve.P_256)
+            var ephemeralEncryptionKey = new XWingKeyGenerator()
                 .keyID(UUID.randomUUID().toString())
-                .algorithm(JWEAlgorithm.ECDH_ES)
+                .algorithm(JWEAlgorithm.XWING)
                 .generate();
             JWKSet jwkSet = new JWKSet(ephemeralEncryptionKey);
 

@@ -18,10 +18,9 @@ import com.authlete.sd.SDJWT;
 import com.authlete.sd.SDObjectBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.jwk.MLDSAKey;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,7 +74,7 @@ class SdJwtVpTokenVerifierTest {
         when(management.getConfigurationOverride()).thenReturn(new ConfigurationOverride(null, null, null, null, null, null));
 
         when(issuerPublicKeyLoader.loadPublicKey(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE))
-                .thenReturn(KeyFixtures.issuerKey().toPublicKey());
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
 
         // Status list verification is out of scope of this unit, so we simulate "no status entries"
         when(statusListReferenceFactory.createStatusListReferences(any(), any())).thenReturn(List.of());
@@ -89,7 +88,7 @@ class SdJwtVpTokenVerifierTest {
         var vcIssuerDid = "did:example:third";
         var vcIssuerKid = vcIssuerDid + "#key-1";
         when(issuerPublicKeyLoader.loadPublicKey(vcIssuerDid, vcIssuerKid))
-                .thenReturn(KeyFixtures.issuerKey().toPublicKey());
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
 
         var emulator = new SDJWTCredentialMock(vcIssuerDid, vcIssuerKid);
         var sdjwt = emulator.createSDJWTMock();
@@ -101,7 +100,7 @@ class SdJwtVpTokenVerifierTest {
         var trustIssuerDid = "did:example:trust";
         var trustIssuerKid = trustIssuerDid + "#key-1";
         when(issuerPublicKeyLoader.loadPublicKey(trustIssuerDid, trustIssuerKid))
-                .thenReturn(KeyFixtures.issuerKey().toPublicKey());
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
 
         // Important: subject of trust statement must match vcIssuerDid so that isProvidingTrust() returns true
         var trustStatement = emulator.createTrustStatementIssuanceV1(trustIssuerDid, trustIssuerKid, vcIssuerDid);
@@ -127,7 +126,7 @@ class SdJwtVpTokenVerifierTest {
         var sdjwt = emulator.createSDJWTMock();
 
         when(issuerPublicKeyLoader.loadPublicKey(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE))
-                .thenReturn(KeyFixtures.issuerKey().toPublicKey());
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
 
         // Audience intentionally mismatched
         var wrongAudience = "did:example:someone-else";
@@ -226,13 +225,13 @@ class SdJwtVpTokenVerifierTest {
         disclosure.add(nameDisc);
 
         JWSHeader header =
-                new JWSHeader.Builder(JWSAlgorithm.ES256)
+                new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44)
                         .type(new JOSEObjectType("dc+sd-jwt")).build();
 
         JWTClaimsSet claimsSet = JWTClaimsSet.parse(builder.build(true));
         SignedJWT jwt = new SignedJWT(header, claimsSet);
-        ECKey privateKey = new ECKeyGenerator(Curve.P_256).generate();
-        JWSSigner signer = new ECDSASigner(privateKey);
+        MLDSAKey privateKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).generate();
+        JWSSigner signer = new MLDSASigner(privateKey);
         jwt.sign(signer);
 
         SDJWT sdJwt = new SDJWT(jwt.serialize(), disclosure);
@@ -280,13 +279,13 @@ class SdJwtVpTokenVerifierTest {
         var claimsForSdJWT = getClaimsFromSdJwt(disclosure);
 
         JWSHeader header =
-                new JWSHeader.Builder(JWSAlgorithm.ES256)
+                new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44)
                         .type(new JOSEObjectType(credentialTyp)).build();
 
         JWTClaimsSet claimsSet = JWTClaimsSet.parse(claimsForSdJWT.build());
         SignedJWT jwt = new SignedJWT(header, claimsSet);
-        ECKey privateKey = new ECKeyGenerator(Curve.P_256).generate();
-        JWSSigner signer = new ECDSASigner(privateKey);
+        MLDSAKey privateKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).generate();
+        JWSSigner signer = new MLDSASigner(privateKey);
         jwt.sign(signer);
 
         SDJWT sdJwt = new SDJWT(jwt.serialize(), disclosure);

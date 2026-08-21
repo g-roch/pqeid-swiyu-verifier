@@ -15,10 +15,10 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWEAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSSigner;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jose.jwk.Curve;
+import com.nimbusds.jose.crypto.MLDSASigner;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
+import com.nimbusds.jose.jwk.gen.XWingKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,7 +82,7 @@ class RequestObjectServiceTest {
         var mockedManagement = mockManagement(true);
 
         when(signerProvider.canProvideSigner()).thenReturn(true);
-        JWSSigner jwsSigner = new ECDSASigner(new ECKeyGenerator(Curve.P_256).generate());
+        JWSSigner jwsSigner = new MLDSASigner(new MLDSAKeyGenerator(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44).generate());
         when(signerProvider.getSigner()).thenReturn(jwsSigner);
         when(jwtSigningService.signJwt(
                 org.mockito.ArgumentMatchers.any(),
@@ -91,7 +91,7 @@ class RequestObjectServiceTest {
                 org.mockito.ArgumentMatchers.eq("did:example:123#key1")
         )).thenAnswer(invocation -> {
             var claimsSet = invocation.getArgument(0, JWTClaimsSet.class);
-            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ES256)
+            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44)
                     .keyID("did:example:123#key1")
                     .type(new com.nimbusds.jose.JOSEObjectType("oauth-authz-req+jwt"))
                     .customParam(SwissProfileVersions.PROFILE_VERSION_PARAM, SwissProfileVersions.VERIFICATION_PROFILE_VERSION)
@@ -135,7 +135,7 @@ class RequestObjectServiceTest {
         var override = new ConfigurationOverride(externalUrl, overrideDid, verificationMethod, null, null, clientMetadata);
         when(management.getConfigurationOverride()).thenReturn(override);
         when(signerProvider.canProvideSigner()).thenReturn(true);
-        JWSSigner jwsSigner = new ECDSASigner(new ECKeyGenerator(Curve.P_256).generate());
+        JWSSigner jwsSigner = new MLDSASigner(new MLDSAKeyGenerator(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44).generate());
         when(signerProvider.getSigner()).thenReturn(jwsSigner);
         when(jwtSigningService.signJwt(
                 org.mockito.ArgumentMatchers.any(),
@@ -144,7 +144,7 @@ class RequestObjectServiceTest {
                 org.mockito.ArgumentMatchers.eq("did:override#key1")
         )).thenAnswer(invocation -> {
             var claimsSet = invocation.getArgument(0, JWTClaimsSet.class);
-            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ES256)
+            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44)
                     .keyID("did:override#key1")
                     .type(new com.nimbusds.jose.JOSEObjectType("oauth-authz-req+jwt"))
                     .customParam(SwissProfileVersions.PROFILE_VERSION_PARAM, SwissProfileVersions.VERIFICATION_PROFILE_VERSION)
@@ -175,7 +175,7 @@ class RequestObjectServiceTest {
 
         when(applicationProperties.getClientIdPrefix()).thenReturn(null);
         when(signerProvider.canProvideSigner()).thenReturn(true);
-        JWSSigner jwsSigner = new ECDSASigner(new ECKeyGenerator(Curve.P_256).generate());
+        JWSSigner jwsSigner = new MLDSASigner(new MLDSAKeyGenerator(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44).generate());
         when(signerProvider.getSigner()).thenReturn(jwsSigner);
         when(jwtSigningService.signJwt(
                 org.mockito.ArgumentMatchers.any(),
@@ -184,7 +184,7 @@ class RequestObjectServiceTest {
                 org.mockito.ArgumentMatchers.eq("did:example:123#key1")
         )).thenAnswer(invocation -> {
             var claimsSet = invocation.getArgument(0, JWTClaimsSet.class);
-            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ES256)
+            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44)
                     .keyID("did:example:123#key1")
                     .type(new com.nimbusds.jose.JOSEObjectType("oauth-authz-req+jwt"))
                     .customParam(SwissProfileVersions.PROFILE_VERSION_PARAM, SwissProfileVersions.VERIFICATION_PROFILE_VERSION)
@@ -213,7 +213,7 @@ class RequestObjectServiceTest {
         when(management.getJwtSecuredAuthorizationRequest()).thenReturn(false);
         when(management.getConfigurationOverride()).thenReturn(new ConfigurationOverride(null, null, null, null, null, null));
         when(management.getOauthState()).thenReturn(UUID.randomUUID().toString());
-        JWSSigner jwsSigner = new ECDSASigner(new ECKeyGenerator(Curve.P_256).generate());
+        JWSSigner jwsSigner = new MLDSASigner(new MLDSAKeyGenerator(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44).generate());
         when(jwtSigningService.signJwt(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.isNull(),
@@ -221,7 +221,7 @@ class RequestObjectServiceTest {
                 org.mockito.ArgumentMatchers.eq("did:example:123#key1")
         )).thenAnswer(invocation -> {
             var claimsSet = invocation.getArgument(0, JWTClaimsSet.class);
-            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ES256)
+            JWSHeader header = new JWSHeader.Builder(com.nimbusds.jose.JWSAlgorithm.ML_DSA_44)
                     .keyID("did:example:123#key1")
                     .type(new com.nimbusds.jose.JOSEObjectType("oauth-authz-req+jwt"))
                     .customParam(SwissProfileVersions.PROFILE_VERSION_PARAM, SwissProfileVersions.VERIFICATION_PROFILE_VERSION)
@@ -236,9 +236,9 @@ class RequestObjectServiceTest {
         when(management.getResponseSpecification()).thenReturn(responseSpecification);
         when(responseSpecification.getResponseModeType()).thenReturn(ResponseModeType.DIRECT_POST_JWT);
 
-        var ephemeralEncryptionKey = assertDoesNotThrow(() -> new ECKeyGenerator(Curve.P_256)
+        var ephemeralEncryptionKey = assertDoesNotThrow(() -> new XWingKeyGenerator()
                 .keyID(UUID.randomUUID().toString())
-                .algorithm(JWEAlgorithm.ECDH_ES)
+                .algorithm(JWEAlgorithm.XWING)
                 .generate());
         JWKSet jwkSet = new JWKSet(ephemeralEncryptionKey);
         when(responseSpecification.getJwks()).thenReturn(jwkSet.toString());

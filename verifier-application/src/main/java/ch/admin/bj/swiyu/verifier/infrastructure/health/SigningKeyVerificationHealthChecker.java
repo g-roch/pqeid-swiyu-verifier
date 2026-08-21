@@ -9,7 +9,7 @@ import ch.admin.eid.did_sidekicks.DidSidekicksException;
 import ch.admin.eid.did_sidekicks.Jwk;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
+import com.nimbusds.jose.crypto.MLDSAVerifier;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -145,6 +145,13 @@ public class SigningKeyVerificationHealthChecker extends CachedHealthChecker {
      * @param jwk The Jwk containing the public key
      * @return true if signature verification succeeds, false otherwise
      */
+    // PQEID: ECDSA -> ML-DSA. Known blocker, not fixed here - the `Jwk` dictionary in
+    // repos/didresolver's did_sidekicks.udl (upstream Rust/UniFFI crate, kept unmodified per
+    // CLAUDE.md) only exposes EC/OKP-shaped fields (kty, crv, x, y, ...), with no room for the
+    // "pub" field an ML-DSA JWK needs (see AKPJWK.PUBLIC_KEY_PARAMETER in the nimbus fork). The
+    // map built below can never carry ML-DSA key material, so JWK.parse(map).toMLDSAKey() will
+    // fail until the Rust Jwk struct is extended (or forked) upstream, same root cause as
+    // IssuerPublicKeyLoader.parseJwk().
     private boolean verifySignature(SignedJWT signedJwt, Jwk jwk)
             throws JOSEException, ParseException {
 
@@ -154,10 +161,10 @@ public class SigningKeyVerificationHealthChecker extends CachedHealthChecker {
         map.put("x", jwk.getX());
         map.put("y", jwk.getY());
         map.put("kid", jwk.getKid());
-        // Convert to EC public key
-        JWK publicKey = JWK.parse(map).toECKey();
+        // Convert to ML-DSA public key
+        JWK publicKey = JWK.parse(map).toMLDSAKey();
         // Create verifier and verify signature
-        JWSVerifier verifier = new ECDSAVerifier(publicKey.toECKey());
+        JWSVerifier verifier = new MLDSAVerifier(publicKey.toMLDSAKey());
         return signedJwt.verify(verifier);
     }
 

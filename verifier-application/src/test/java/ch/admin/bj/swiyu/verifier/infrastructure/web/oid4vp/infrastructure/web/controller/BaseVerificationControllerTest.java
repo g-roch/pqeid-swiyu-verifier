@@ -8,9 +8,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWEAlgorithm;
-import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.jwk.gen.XWingKeyGenerator;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -167,9 +166,9 @@ public abstract class BaseVerificationControllerTest {
                 .build());
 
 
-        var ephemeralEncryptionKey = new ECKeyGenerator(Curve.P_256)
+        var ephemeralEncryptionKey = new XWingKeyGenerator()
           .keyID(UUID.randomUUID().toString())
-          .algorithm(JWEAlgorithm.ECDH_ES)
+          .algorithm(JWEAlgorithm.XWING)
           .generate();
         JWKSet jwkSet = new JWKSet(ephemeralEncryptionKey);
         managementEntityRepository.save(Management.builder()

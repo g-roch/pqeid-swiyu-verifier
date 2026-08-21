@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ValidJwtValues {
-    String message() default "Invalid jwt values provided. Only ES256 is supported.";
+    String message() default "Invalid jwt values provided. Only ML-DSA-44 is supported.";
 
     Class<?>[] groups() default {};
 

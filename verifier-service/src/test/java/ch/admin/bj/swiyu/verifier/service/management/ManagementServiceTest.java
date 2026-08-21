@@ -10,8 +10,8 @@ import ch.admin.bj.swiyu.verifier.domain.management.Management;
 import ch.admin.bj.swiyu.verifier.domain.management.ManagementRepository;
 import ch.admin.bj.swiyu.verifier.domain.management.dcql.DcqlQuery;
 import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.ECDHDecrypter;
-import com.nimbusds.jose.crypto.ECDHEncrypter;
+import com.nimbusds.jose.crypto.XWingDecrypter;
+import com.nimbusds.jose.crypto.XWingEncrypter;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,21 +181,21 @@ class ManagementServiceTest {
         // Validate that keys can be indeed be used together by doing a dry run of the encryption
         for (JWK jwk : jwkSet.getKeys()) {
             assertThat(jwk.getAlgorithm()).isNotNull().as("For OID4VP algorithm MUST be not null");
-            assertThat(jwk.getAlgorithm()).isEqualTo(JWEAlgorithm.ECDH_ES).as("For swiss profile verification 1.0 only ECDH-ES is supported");
+            assertThat(jwk.getAlgorithm()).isEqualTo(JWEAlgorithm.XWING).as("For swiss profile verification 1.0 only XWING is supported");
             // This part would be done by the wallet
             var encryptionMethod = EncryptionMethod.parse(responseSpec.getEncryptedResponseEncValuesSupported().getFirst());
             JWEObject jweObject = new JWEObject(
-                    new JWEHeader.Builder(JWEAlgorithm.ECDH_ES, encryptionMethod).keyID(jwk.getKeyID()).build(),
+                    new JWEHeader.Builder(JWEAlgorithm.XWING, encryptionMethod).keyID(jwk.getKeyID()).build(),
                     new Payload("Test")
             );
-            assertDoesNotThrow(() -> jweObject.encrypt(new ECDHEncrypter(jwk.toECKey())));
+            assertDoesNotThrow(() -> jweObject.encrypt(new XWingEncrypter(jwk.toXWingKey())));
 
             var encryptedObject = jweObject.serialize();
 
             // In the verifier we decrypt now with the private key
             var parsedJWE = assertDoesNotThrow(() -> JWEObject.parse(encryptedObject));
-            var privateKey = assertDoesNotThrow(() -> jwkSetPrivate.getKeyByKeyId(parsedJWE.getHeader().getKeyID()).toECKey());
-            assertDoesNotThrow(() -> parsedJWE.decrypt(new ECDHDecrypter(privateKey)));
+            var privateKey = assertDoesNotThrow(() -> jwkSetPrivate.getKeyByKeyId(parsedJWE.getHeader().getKeyID()).toXWingKey());
+            assertDoesNotThrow(() -> parsedJWE.decrypt(new XWingDecrypter(privateKey)));
             assertEquals("Test", parsedJWE.getPayload().toString());
         }
 

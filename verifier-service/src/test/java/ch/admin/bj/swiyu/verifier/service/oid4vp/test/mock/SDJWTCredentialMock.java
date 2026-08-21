@@ -8,7 +8,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.ECDSASigner;
+import com.nimbusds.jose.crypto.MLDSASigner;
 import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.MLDSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.Getter;
@@ -27,8 +30,8 @@ public class SDJWTCredentialMock {
     public static final String DEFAULT_KID_HEADER_VALUE = DEFAULT_ISSUER_ID + "#key-1";
     public static final String DEFAULT_VCT = "defaultTestVCT";
 
-    private final ECKey key;
-    private final ECKey holderKey;
+    private final JWK key;
+    private final JWK holderKey;
     private final String issuerId;
     /**
      * The kidHeaderValue is a string that represents the Key ID (KID) header in the JWT header. This value is used to
@@ -38,23 +41,53 @@ public class SDJWTCredentialMock {
      */
     private final String kidHeaderValue;
 
+    // PQEID: ECDSA -> ML-DSA. Defaults to ML-DSA now that's the real supported algorithm
+    // (see SdJwtVpTokenVerifier.SUPPORTED_JWT_ALGORITHMS) - callers that specifically need EC
+    // output (eg. tests exercising the did_sidekicks DID-resolution path, which cannot carry
+    // ML-DSA keys, see pqeid-mldsa-did-resolver-blocker) pass KeyFixtures.issuerKey()/
+    // holderKey() explicitly via the JWK-typed constructors below.
     public SDJWTCredentialMock() {
-        this(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE, KeyFixtures.issuerKey(), KeyFixtures.holderKey());
+        this(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE, KeyFixtures.issuerMLDSAKey(), KeyFixtures.holderMLDSAKey());
     }
 
-    public SDJWTCredentialMock(ECKey key) {
-        this(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE, key, KeyFixtures.holderKey());
+    public SDJWTCredentialMock(JWK key) {
+        this(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE, key, KeyFixtures.holderMLDSAKey());
     }
 
     public SDJWTCredentialMock(String issuerId, String kidHeaderValue) {
-        this(issuerId, kidHeaderValue, KeyFixtures.issuerKey(), KeyFixtures.holderKey());
+        this(issuerId, kidHeaderValue, KeyFixtures.issuerMLDSAKey(), KeyFixtures.holderMLDSAKey());
     }
 
-    public SDJWTCredentialMock(String issuerId, String kidHeaderValue, ECKey key, ECKey holderKey) {
+    public SDJWTCredentialMock(String issuerId, String kidHeaderValue, JWK key, JWK holderKey) {
         this.key = key;
         this.holderKey = holderKey;
         this.issuerId = issuerId;
         this.kidHeaderValue = kidHeaderValue;
+    }
+
+    /**
+     * PQEID: picks ECDSASigner or MLDSASigner based on the concrete key type, so this mock
+     * stays usable for both algorithm families during the migration.
+     */
+    private static JWSSigner signerFor(JWK key) throws JOSEException {
+        if (key instanceof MLDSAKey mldsaKey) {
+            return new MLDSASigner(mldsaKey);
+        }
+        if (key instanceof ECKey ecKey) {
+            return new ECDSASigner(ecKey);
+        }
+        throw new IllegalArgumentException("Unsupported key type: " + key.getKeyType());
+    }
+
+    /**
+     * PQEID: matching JWSAlgorithm for the given key, used as the default when callers don't
+     * explicitly pass one (eg. via createSDJWTMockWithRecursiveListArray()).
+     */
+    private static JWSAlgorithm algorithmFor(JWK key) {
+        if (key instanceof MLDSAKey) {
+            return JWSAlgorithm.ML_DSA_44;
+        }
+        return JWSAlgorithm.ES256;
     }
 
     /**
@@ -197,7 +230,7 @@ public class SDJWTCredentialMock {
     }
 
     public String createSDJWTMockWithRecursiveListArray() {
-        return createSDJWTMockRecursiveObject(null, null, null, DEFAULT_VCT, false, "dc+sd-jwt", JWSAlgorithm.ES256, false);
+        return createSDJWTMockRecursiveObject(null, null, null, DEFAULT_VCT, false, "dc+sd-jwt", algorithmFor(key), false);
     }
 
     public String createSDJWTMockWithClaims(Map<String, Object> sdClaims) {
@@ -220,12 +253,12 @@ public class SDJWTCredentialMock {
                 .claim("vct", "TrustStatementIssuanceV1")
                 .claim("canIssue", DEFAULT_VCT)
                 .build();
-        var headers = new JWSHeader.Builder(JWSAlgorithm.ES256)
+        var headers = new JWSHeader.Builder(algorithmFor(key))
                 .keyID(trustStatementIssuerKeyId)
                 .type(new JOSEObjectType("vc+sd-jwt"))
                 .build();
         SignedJWT jwt = new SignedJWT(headers, claims);
-        jwt.sign(new ECDSASigner(key));
+        jwt.sign(signerFor(key));
         return jwt.serialize()+"~";
     }
 
@@ -247,9 +280,9 @@ public class SDJWTCredentialMock {
         proofData.put("iat", iat);
         proofData.put("aud", aud);
         proofData.put("nonce", nonce);
-        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ES256).type(new JOSEObjectType(format)).build();
+        JWSHeader header = new JWSHeader.Builder(algorithmFor(holderKey)).type(new JOSEObjectType(format)).build();
         var jwt = new SignedJWT(header, JWTClaimsSet.parse(proofData));
-        jwt.sign(new ECDSASigner(holderKey));
+        jwt.sign(signerFor(holderKey));
         return sdjwt + jwt.serialize();
     }
 
@@ -290,7 +323,7 @@ public class SDJWTCredentialMock {
             }
         });
 
-        return createSdJWT(builder, disclosures, validFrom, validUntil, statusListIndex, vct,  useLegacyCnfFormat, credentialFormat, JWSAlgorithm.ES256, skipCnf);
+        return createSdJWT(builder, disclosures, validFrom, validUntil, statusListIndex, vct,  useLegacyCnfFormat, credentialFormat, algorithmFor(key), skipCnf);
     }
 
     public String createNestedSDJWTMock() {
@@ -299,7 +332,7 @@ public class SDJWTCredentialMock {
 
         var builder = getClaimsFromSdJwt(disclosures);
 
-        return createSdJWT(builder, disclosures, null, null, null, DEFAULT_VCT, false, "vc+sd-jwt", JWSAlgorithm.ES256, false);
+        return createSdJWT(builder, disclosures, null, null, null, DEFAULT_VCT, false, "vc+sd-jwt", algorithmFor(key), false);
     }
 
     public String createSdJWT(SDObjectBuilder builder, List<Disclosure> disclosures, Long validFrom, Long validUntil, Integer statusListIndex, String vct, boolean useLegacyCnfFormat, String credentialFormat, JWSAlgorithm jwsAlgorithm, boolean skipCnf) {
@@ -346,7 +379,7 @@ public class SDJWTCredentialMock {
                     .build();
             JWTClaimsSet claimsSet = JWTClaimsSet.parse(claims);
             SignedJWT jwt = new SignedJWT(header, claimsSet);
-            JWSSigner signer = new ECDSASigner(key);
+            JWSSigner signer = signerFor(key);
             jwt.sign(signer);
 
             return new SDJWT(jwt.serialize(), disclosures).toString();

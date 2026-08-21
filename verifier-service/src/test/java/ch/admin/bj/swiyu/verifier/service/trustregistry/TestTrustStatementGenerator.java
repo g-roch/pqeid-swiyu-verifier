@@ -6,8 +6,8 @@ import java.text.ParseException;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.ECDSASigner;
-import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.jwk.MLDSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
@@ -16,13 +16,13 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TestTrustStatementGenerator {
 
-    private final ECKey key;
+    private final MLDSAKey key;
 
     public SignedJWT generateIdTsJwt(String trustIssuerKid, String subject) {
         return assertDoesNotThrow(() -> createTestSignedJwt("""
                     {
                     "typ": "swiyu-identity-trust-statement+jwt",
-                    "alg": "ES256",
+                    "alg": "ML-DSA-44",
                     "kid": "%s",
                 	"profile_version": "swiss-profile-trust:1.0.0"
                 }""".formatted(trustIssuerKid),
@@ -59,7 +59,7 @@ public class TestTrustStatementGenerator {
         return assertDoesNotThrow(() -> createTestSignedJwt("""
                         {
                     "typ": "swiyu-protected-issuance-authorization-trust-statement+jwt",
-                    "alg": "ES256",
+                    "alg": "ML-DSA-44",
                     "kid": "%s",
                 	"profile_version": "swiss-profile-trust:1.0.0"
                 }""".formatted(trustIssuerKid),
@@ -88,7 +88,7 @@ public class TestTrustStatementGenerator {
         return assertDoesNotThrow(() -> createTestSignedJwt("""
                          {
                     "typ": "swiyu-protected-issuance-trust-list-statement+jwt",
-                    "alg": "ES256",
+                    "alg": "ML-DSA-44",
                     "kid": "%s",
                 	"profile_version": "swiss-profile-trust:1.0.0"
                 }""".formatted(trustIssuerKid),
@@ -117,7 +117,7 @@ public class TestTrustStatementGenerator {
         return assertDoesNotThrow(() -> createTestSignedJwt("""
                 {
                     "typ": "swiyu-non-compliance-trust-list-statement+jwt",
-                    "alg": "ES256",
+                    "alg": "ML-DSA-44",
                     "kid": "%s",
                 	"profile_version": "swiss-profile-trust:1.0.0"
                 }""".formatted(trustIssuerKid),
@@ -165,7 +165,7 @@ public class TestTrustStatementGenerator {
 
         return assertDoesNotThrow(() -> createTestSignedJwt("""
                             {
-                  "alg": "ES256",
+                  "alg": "ML-DSA-44",
                   "kid": "%s",
                   "typ": "statuslist+jwt",
                   "profile_version": "swiss-profile-vc:1.0.0"
@@ -188,7 +188,7 @@ public class TestTrustStatementGenerator {
 
     private SignedJWT createTestSignedJwt(String headerJson, String bodyJson) throws ParseException, JOSEException {
         SignedJWT jwt = new SignedJWT(JWSHeader.parse(headerJson), JWTClaimsSet.parse(bodyJson));
-        jwt.sign(new ECDSASigner(key));
+        jwt.sign(new MLDSASigner(key));
         return jwt;
 
     }

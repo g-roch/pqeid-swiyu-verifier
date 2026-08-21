@@ -13,9 +13,9 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.MLDSAKey;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jwt.SignedJWT;
 
 import ch.admin.bj.swiyu.verifier.domain.management.Management;
@@ -52,7 +52,7 @@ class TrustProtocol2ValidatorTest {
     private ObjectMapper mapper = new ObjectMapper();
     private Management management;
     private TrustAnchor anchor;
-    private ECKey mockKey;
+    private MLDSAKey mockKey;
     private static final String TRUST_ROOT = "did:webvh:testscid:anchor1";
     private static final String TRUST_ROOT_KID = TRUST_ROOT + "#key-1";
     private static final String ISSUER_DID = "did:webvh:testscid:issuer";
@@ -72,7 +72,7 @@ class TrustProtocol2ValidatorTest {
         management = Management.builder()
                 .trustAnchors(List.of(anchor))
                 .build();
-        mockKey = new ECKeyGenerator(Curve.P_256).keyID(TRUST_ROOT_KID).generate();
+        mockKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).keyID(TRUST_ROOT_KID).generate();
         trustStatementGenerator = new TestTrustStatementGenerator(mockKey);
 
         when(keyLoader.loadJWK(anyString(), anyString())).thenReturn(mockKey.toPublicJWK());

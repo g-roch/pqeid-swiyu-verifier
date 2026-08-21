@@ -8,16 +8,16 @@ import ch.admin.bj.swiyu.verifier.service.publickey.LoadingPublicKeyOfIssuerFail
 import ch.admin.bj.swiyu.verifier.service.statuslist.StatusListResolverAdapter;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
+import com.nimbusds.jose.crypto.MLDSAVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.BadJWTException;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.jcajce.interfaces.MLDSAPublicKey;
 
 import java.io.IOException;
 import java.security.PublicKey;
-import java.security.interfaces.ECPublicKey;
 import java.text.ParseException;
 import java.util.Map;
 import java.util.Optional;
@@ -45,9 +45,10 @@ class TokenStatusListReference extends StatusListReference {
         super(adapter, statusListReferenceClaims, issuerPublicKeyLoader, referencedTokenIssuer, maxBufferSize);
     }
 
+    // PQEID: ECDSA -> ML-DSA
     private static JWSVerifier toJwsVerifier(PublicKey publicKey) throws JOSEException {
-        if (publicKey instanceof ECPublicKey ecPublicKey) {
-            return new ECDSAVerifier(ecPublicKey);
+        if (publicKey instanceof MLDSAPublicKey mldsaPublicKey) {
+            return new MLDSAVerifier(mldsaPublicKey);
         }
         throw new IllegalArgumentException("Unsupported public key type: " + publicKey.getClass().getName());
     }
