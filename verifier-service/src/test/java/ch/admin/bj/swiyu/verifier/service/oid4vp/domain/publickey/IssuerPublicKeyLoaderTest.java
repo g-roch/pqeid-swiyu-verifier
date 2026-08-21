@@ -16,9 +16,13 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jose.crypto.ECDSAVerifier;
+import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.crypto.MLDSAVerifier;
 import com.nimbusds.jose.jwk.Curve;
 import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.jwk.MLDSAKey;
 import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -170,7 +174,8 @@ class IssuerPublicKeyLoaderTest {
             testKey.getKeyType().toString(),
             testKey.getCurve().toString(),
             testKey.toPublicJWK().getX().toString(),
-            testKey.toPublicJWK().getY().toString());
+            testKey.toPublicJWK().getY().toString(),
+            null); // PQEID: "pub" (ML-DSA/AKP key material) - not applicable to this EC test key
         when(mockedDidResolverFacade.resolveDid(DID, KEY_ID)).thenReturn(testKeyJwk);
         var loadedKey = assertDoesNotThrow(() -> publicKeyLoader.loadJWK(DID, DID + "#" + KEY_ID));
         // Evaluate that the key performs the same way
@@ -178,5 +183,30 @@ class IssuerPublicKeyLoaderTest {
         var jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.ES256).keyID(jwtKid).build(), new JWTClaimsSet.Builder().audience("Test").build());
         jwt.sign(new ECDSASigner(testKey));
         assertThat(jwt.verify(new ECDSAVerifier((ECKey) loadedKey))).as("Signature MUST be valid").isTrue();
+    }
+
+    // PQEID: same round-trip as loadPublicDidKey_keyIdModification above, but for an ML-DSA (AKP)
+    // verification method - proves the didresolver "pub" field patch actually reaches a working
+    // key through loadJWK(), not just that the mapping code compiles.
+    @Test
+    void loadPublicDidKey_mldsa() throws JOSEException, DidResolverException, DidSidekicksException {
+        final String KEY_ID = "key-1";
+        final String DID = "did:example";
+        var testKey = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).keyID(KEY_ID).generate();
+        var pub = (String) testKey.toPublicJWK().toJSONObject().get("pub");
+        var testKeyJwk = new Jwk(
+            testKey.getAlgorithm().toString(),
+            testKey.getKeyID(),
+            testKey.getKeyType().toString(),
+            null,
+            null,
+            null,
+            pub);
+        when(mockedDidResolverFacade.resolveDid(DID, KEY_ID)).thenReturn(testKeyJwk);
+        var loadedKey = assertDoesNotThrow(() -> publicKeyLoader.loadJWK(DID, DID + "#" + KEY_ID));
+        var jwtKid = DID + "#" + KEY_ID;
+        var jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44).keyID(jwtKid).build(), new JWTClaimsSet.Builder().audience("Test").build());
+        jwt.sign(new MLDSASigner(testKey));
+        assertThat(jwt.verify(new MLDSAVerifier((MLDSAKey) loadedKey))).as("Signature MUST be valid").isTrue();
     }
 }

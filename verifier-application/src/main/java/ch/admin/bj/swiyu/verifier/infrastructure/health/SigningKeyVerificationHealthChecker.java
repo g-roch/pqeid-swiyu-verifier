@@ -145,22 +145,21 @@ public class SigningKeyVerificationHealthChecker extends CachedHealthChecker {
      * @param jwk The Jwk containing the public key
      * @return true if signature verification succeeds, false otherwise
      */
-    // PQEID: ECDSA -> ML-DSA. Known blocker, not fixed here - the `Jwk` dictionary in
-    // repos/didresolver's did_sidekicks.udl (upstream Rust/UniFFI crate, kept unmodified per
-    // CLAUDE.md) only exposes EC/OKP-shaped fields (kty, crv, x, y, ...), with no room for the
-    // "pub" field an ML-DSA JWK needs (see AKPJWK.PUBLIC_KEY_PARAMETER in the nimbus fork). The
-    // map built below can never carry ML-DSA key material, so JWK.parse(map).toMLDSAKey() will
-    // fail until the Rust Jwk struct is extended (or forked) upstream, same root cause as
-    // IssuerPublicKeyLoader.parseJwk().
+    // PQEID: the did_sidekicks.Jwk UniFFI/Kotlin data class's "pub" member (ML-DSA/AKP public
+    // key material) is exposed to Java as getPubKey() (Kotlin camelCase) - mapped to "pub"
+    // explicitly below, since that's the JWK member name JWK.parse()/MLDSAKey.parse() require.
     private boolean verifySignature(SignedJWT signedJwt, Jwk jwk)
             throws JOSEException, ParseException {
 
         final Map<String, Object> map = new HashMap<>();
+        map.put("alg", jwk.getAlg());
         map.put("kty", jwk.getKty());
         map.put("crv", jwk.getCrv());
         map.put("x", jwk.getX());
         map.put("y", jwk.getY());
         map.put("kid", jwk.getKid());
+        map.put("pub", jwk.getPubKey());
+        map.values().removeIf(java.util.Objects::isNull);
         // Convert to ML-DSA public key
         JWK publicKey = JWK.parse(map).toMLDSAKey();
         // Create verifier and verify signature

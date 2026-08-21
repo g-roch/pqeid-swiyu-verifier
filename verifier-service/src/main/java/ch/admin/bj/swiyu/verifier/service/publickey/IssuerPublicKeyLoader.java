@@ -5,7 +5,6 @@ import ch.admin.eid.did_sidekicks.DidSidekicksException;
 import ch.admin.eid.did_sidekicks.Jwk;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.JWK;
@@ -103,15 +102,21 @@ public class IssuerPublicKeyLoader {
             throw new IllegalArgumentException("Failed to parse Json Web Key from verification method since no jwk was provided");
         }
         try {
-            // PQEID: known blocker, not fixed here - the `Jwk` dictionary in repos/didresolver's
-            // did_sidekicks.udl (upstream Rust/UniFFI crate, kept unmodified per CLAUDE.md) is
-            // hardcoded to EC/OKP-shaped fields (kty, crv, x, y, ...). An ML-DSA JWK needs a "pub"
-            // field (see AKPJWK.PUBLIC_KEY_PARAMETER in the nimbus fork), which this struct has no
-            // room for - converting it here will never produce a parseable ML-DSA JWK. Resolving
-            // ML-DSA verification methods from real DID documents requires extending the Rust Jwk
-            // struct upstream (or a local fork, mirroring the nimbus-jose-jwt approach) before this
-            // path works end-to-end.
-            Map<String, Object> json = objectMapper.convertValue(jwk, new TypeReference<>() {});
+            // PQEID: explicit field mapping instead of objectMapper.convertValue(jwk, ...) - the
+            // did_sidekicks.Jwk UniFFI/Kotlin data class's "pub" member (ML-DSA/AKP public key
+            // material, see repos/didresolver's did_sidekicks.udl) is exposed to Java as
+            // getPubKey() (Kotlin camelCase), which Jackson's default bean conversion would emit
+            // as "pubKey", not the "pub" JWK member name that JWK.parse()/MLDSAKey.parse()
+            // require. The other members happen to already match the JWK spec's own names (alg,
+            // kid, kty, crv, x, y), which is why convertValue() worked for those without this.
+            Map<String, Object> json = new java.util.HashMap<>();
+            json.put("alg", jwk.getAlg());
+            json.put("kty", jwk.getKty());
+            json.put("crv", jwk.getCrv());
+            json.put("x", jwk.getX());
+            json.put("y", jwk.getY());
+            json.put("pub", jwk.getPubKey());
+            json.values().removeIf(java.util.Objects::isNull);
             json.put("kid", issuerDid+"#"+jwk.getKid());
             // Create kid as used in swiss-profile-anchor
             return JWK.parse(json);
