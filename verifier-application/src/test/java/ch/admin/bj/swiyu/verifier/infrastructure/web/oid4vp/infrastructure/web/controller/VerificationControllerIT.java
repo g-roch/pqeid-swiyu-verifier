@@ -19,12 +19,12 @@ import com.authlete.sd.Disclosure;
 import com.authlete.sd.SDObjectBuilder;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.*;
-import com.nimbusds.jose.crypto.ECDHEncrypter;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
-import com.nimbusds.jose.jwk.Curve;
-import com.nimbusds.jose.jwk.ECKey;
+import com.nimbusds.jose.crypto.MLDSAVerifier;
+import com.nimbusds.jose.crypto.XWingEncrypter;
 import com.nimbusds.jose.jwk.JWKSet;
-import com.nimbusds.jose.jwk.gen.ECKeyGenerator;
+import com.nimbusds.jose.jwk.MLDSAKey;
+import com.nimbusds.jose.jwk.XWingKey;
+import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jose.shaded.gson.internal.LinkedTreeMap;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -75,7 +75,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 class VerificationControllerIT extends BaseVerificationControllerTest {
 
-    private static final String PUBLIC_KEY = "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"oqBwmYd3RAHs-sFe_U7UFTXbkWmPAaqKTHCvsV8tvxU\",\"y\":\"np4PjpDKNfEDk9qwzZPqjAawiZ8sokVOozHR-Kt89T4\"}";
+    // PQEID: must match verifier-application/src/test/resources/application-test.yml's
+    // signing_key (same real ML-DSA-44 key BlackboxIT.PUBLIC_KEY uses - both classes run
+    // against the same "test" profile config, so the verifier's own request-object
+    // signatures are checked against the same public key).
+    private static final String PUBLIC_KEY = "{\"kty\":\"AKP\",\"alg\":\"ML-DSA-44\",\"pub\":\"50Js8eyUoqJrGFp-OtOaOdyA3tKjpUytCkHTQjew8MfzsF_uCM607yS3SG0zaFh6W8JTKjb6Uoy7sjyeapZcpoHRRgbTHDycGrn28AY_AAHj0NDixwv-0wRC2vfXWD-QR0IAuGA91N779mHYojs3suGadxWUjMKs7v569YpXr2yljGIKWA8g0yK-lq0Jh40_ke00eJxtt5JQV1Nu_msllBH1GXR5n0YB0SplSsM4migemsqEoMWAeZHNJCQFdeiX3klr7NSm8jCSdfSx7xBQpBg49tLtcCZS2DxYEPr1lMJTBit6v7GBeH3a090QtxqlkoXtqZDZB7QKgwc-hQtAMLLDNRT3G2wZ1xCl5AobJ48ezAIY0Be6nVR5uwBnMDNqTKJyQpHICkYEsmsk-uaaMz_TTmIp0OyAGMuot97Y7ejlkDeho7F5gf0tnPCngrlY1o4BxIs7ep53VnPmFr8C3Qrw0x54jkNi0AiJWuilJrDstdwlnS8dZp9-u50XjUoYm-v_oGD1z-ubTJKdVOvz708oH5SIVTGr7q8NbJ5Zh8tpdtLuWhYwdrIEkcWzzcG3EXXXGTC-AGFs-dzmzuea9icw4hDAOdL9umbxxeMDhKuhSsDj5r6HgxHsWPVPiiqn-nXNjL57mW1H9ZJ5KFvU-CajBLoPV31ISxMXHeF63P15CEo2cS7lA-1co065uf4LsLK0P2YaTRxTqf6J3PDrDA_YihLOxLQYabPoLUSj_rXsWPbEnX1looB0eA8tCJj_swovD1OtJ0odClFFblZ2imFUqsb3MkkxPlaYCFno-_znZaHbtYV4qljg6-fTbARth9zJIkfL70pMtWR2Sa2z1ewfHz7mR9wTwy2W3STLoPaDMN6WeioDVGU0kKq2cSIahJoONgB3H4vJhPRCO1ZWaU4jqv5jCN8BJP4GBfXF9qiJjfOSfiKHIkmOH5CoUsvmg0Y0cfxyjPqaHPq8YgiOThWTBxYSQPPKb-ylrwRwpFUANaCkasIb3q7nzxXQxgqjUuS6wVNbP63XqtwOtl36Sy438VlOPStb37vo4wy6B_dsjzBZUKyCdlzc8liyMf2j2MvO6Tjje-8v1CP45ix0W4gNNzP3jyhgSkMCH6c5G8RrZOAgQA75B8J4QfYozRHJ4yBtmOaMZFKbQ-1U3jHUPUogQFxeoNZmaW8ObxFgp6oidIHNeyl8bbE5meIPpitCKASxo4x3jczmld5hqMh15pgUAvowrP2awJPqewCbkOV3KO5lQZZwslR-DWI52xcsPHT7wX0FejJyjNixASgMoCLssEAxdtq4Y9qkgD1mXm0GBf12Y8o70zRgbbc_Twt0yH9mgbvXz6EwASCF7B-x-ym2I0wrAIz2BhtlZDKLJNDQQXRZvRp7OmQ6N88KAHY9MKh0Lp2x0dBk8pf6UteUHuPNPU9HXH2bB-HX2cdvwib382VaMqYP35L44rXN_twwjo_OWv3auyFVPv1LgjwFnvfkj0c_59zjD0JVKep5BQ8CYElBea339RYGnVh8v64WQObbiBmyFvkAL1iCY8d1zeiiSE3yWcOxkAFzxTmDvSRjfWDCH6AjeFeTss57U8Ve6G8-04Hff7uwcFBgL-hhLN9SAWvNT1c88c_ZgJo6Re68HPGX4wzilGay9_irQ6VGR3COFTrFg66x5EziONJzKPw3wXcq5v9k8edQ8K44r2ftuVk-rZ6aPErSC8MZIG3eNEs2-to7qg7nbMkAEDRyfQ\"}";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final String responseDataUriFormat = "/oid4vp/api/request-object/%s/response-data";
@@ -176,9 +180,9 @@ class VerificationControllerIT extends BaseVerificationControllerTest {
                 .andExpect(status().isOk())
                 .andDo(result -> {
                     var responseJwt = SignedJWT.parse(result.getResponse().getContentAsString());
-                    assertThat(responseJwt.getHeader().getAlgorithm().getName()).isEqualTo("ES256");
+                    assertThat(responseJwt.getHeader().getAlgorithm().getName()).isEqualTo("ML-DSA-44");
                     assertThat(responseJwt.getHeader().getKeyID()).isEqualTo(applicationProperties.getSigningKeyVerificationMethod());
-                    assertThat(responseJwt.verify(new ECDSAVerifier(ECKey.parse(PUBLIC_KEY)))).isTrue();
+                    assertThat(responseJwt.verify(new MLDSAVerifier(MLDSAKey.parse(PUBLIC_KEY)))).isTrue();
 
                     // checking claims
                     var claims = responseJwt.getJWTClaimsSet();
@@ -266,18 +270,18 @@ class VerificationControllerIT extends BaseVerificationControllerTest {
                     .andExpect(status().isOk());
         } else if (responseSpecification.getResponseModeType() == ResponseModeType.DIRECT_POST_JWT) {
             // JWKS & encryptionMethod are normally provided in Request Object
-            ECKey publicKey = JWKSet.parse(responseSpecification.getJwks()).getKeys().getFirst().toECKey();
+            XWingKey publicKey = JWKSet.parse(responseSpecification.getJwks()).getKeys().getFirst().toXWingKey();
             var encryptionMethod = EncryptionMethod.parse(responseSpecification.getEncryptedResponseEncValuesSupported().getFirst());
 
             JWEObject jweObject = new JWEObject(
-                    new JWEHeader.Builder(JWEAlgorithm.ECDH_ES, encryptionMethod)
+                    new JWEHeader.Builder(JWEAlgorithm.XWING, encryptionMethod)
                             .keyID(publicKey.getKeyID()).build(),
                     new JWTClaimsSet.Builder()
                             .claim("vp_token", dcqlVpToken)
                             .claim("state", requestObjectId.toString())
                             .build().toPayload()
             );
-            jweObject.encrypt(new ECDHEncrypter(publicKey));
+            jweObject.encrypt(new XWingEncrypter(publicKey));
             mock.perform(post(String.format(responseDataUriFormat, requestObjectId))
                             .contentType(APPLICATION_FORM_URLENCODED_VALUE)
                             .formField("response", jweObject.serialize()))
@@ -586,8 +590,9 @@ class VerificationControllerIT extends BaseVerificationControllerTest {
 
     @Test
     void shouldVerifyingSDJWTCredentialSDWithDifferentPrivKey_thenException() throws Exception {
-        // GIVEN
-        SDJWTCredentialMock emulator = new SDJWTCredentialMock(new ECKeyGenerator(Curve.P_256).generate());
+        // GIVEN - different (but still ML-DSA) key than the default, so this still tests
+        // "wrong key, same algorithm" rather than tripping the algorithm check first.
+        SDJWTCredentialMock emulator = new SDJWTCredentialMock(new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_44).generate());
         var sdJWT = emulator.createSDJWTMock();
         var vpToken = emulator.addKeyBindingProof(sdJWT, NONCE_SD_JWT_SQL, clientIdWithPrefix);
 
@@ -694,7 +699,7 @@ class VerificationControllerIT extends BaseVerificationControllerTest {
                         .contentType(MediaType.APPLICATION_JSON_VALUE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.client_id").value(applicationProperties.getClientIdPrefix() + ":" +  applicationProperties.getClientId()))
-                .andExpect(jsonPath("$.vp_formats.jwt_vp.alg").value(JWSAlgorithm.ES256.getName()));
+                .andExpect(jsonPath("$.vp_formats.jwt_vp.alg").value(JWSAlgorithm.ML_DSA_44.getName()));
     }
 
     private void mockDidResolverResponse(SDJWTCredentialMock sdjwt) {
@@ -837,7 +842,7 @@ class VerificationControllerIT extends BaseVerificationControllerTest {
         builder.putSDClaim(languagesDisclosure);
 
         var used = disclosures.stream().filter(disc -> (Objects.equals(disc.getClaimName(), "languages") || disc.getClaimValue().equals("IT"))).toList();
-        var sdjwtWithoutKeyBinding = emulator.createSdJWT(builder, disclosures, null, null, null, DEFAULT_VCT, false, "vc+sd-jwt", JWSAlgorithm.ES256, false);
+        var sdjwtWithoutKeyBinding = emulator.createSdJWT(builder, disclosures, null, null, null, DEFAULT_VCT, false, "vc+sd-jwt", JWSAlgorithm.ML_DSA_44, false);
         var test = sdjwtWithoutKeyBinding.split("~")[0]
                 .concat(used.stream().map(disc -> "~" + disc.toString()).reduce("", String::concat))
                 .concat("~");
@@ -1115,9 +1120,9 @@ class VerificationControllerIT extends BaseVerificationControllerTest {
                 .andExpect(status().isOk())
                 .andDo(result -> {
                     var responseJwt = SignedJWT.parse(result.getResponse().getContentAsString());
-                    assertThat(responseJwt.getHeader().getAlgorithm().getName()).isEqualTo("ES256");
+                    assertThat(responseJwt.getHeader().getAlgorithm().getName()).isEqualTo("ML-DSA-44");
                     assertThat(responseJwt.getHeader().getKeyID()).isEqualTo(applicationProperties.getSigningKeyVerificationMethod());
-                    assertThat(responseJwt.verify(new ECDSAVerifier(ECKey.parse(PUBLIC_KEY)))).isTrue();
+                    assertThat(responseJwt.verify(new MLDSAVerifier(MLDSAKey.parse(PUBLIC_KEY)))).isTrue();
 
                     // checking claims
                     var claims = responseJwt.getJWTClaimsSet();
