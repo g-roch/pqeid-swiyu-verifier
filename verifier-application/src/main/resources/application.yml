@@ -47,6 +47,10 @@ application:
     - "status-reg.trust-infra.swiyu.admin.ch"
     - "identifier-reg.trust-infra.swiyu.admin.ch"
     - "identifier-reg.trust-infra.swiyu-int.admin.ch"
+    # PQEID: local-infra reconnection (see CLAUDE.md / pqeid-jeap-real-libs memory) - this
+    # project's registry runs at pqeid.g-roch.ch, not admin.ch.
+    - "status-reg.pqeid.g-roch.ch"
+    - "identifier-reg.pqeid.g-roch.ch"
 
   # ---- OpenID4VP Part ----
 
