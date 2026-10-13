@@ -53,8 +53,8 @@ public record CreateVerificationManagementDto(
                 <li>direct_post - the wallet sends a clear text response</li>
                 <li>direct_post.jwt - the wallet sends an encrypted response</li>
                 </ul>""")
-        @JsonProperty(value = "response_mode", defaultValue = "direct_post")
-        // TODO Once the Ecosystem broadly supports JWE, we should use direct_post_jwt as default value
+        @JsonProperty(value = "response_mode", defaultValue = "direct_post.jwt")
+        // PQEID: default is direct_post.jwt (hybrid X-Wing encrypted responses)
         ResponseModeTypeDto responseMode,
 
         @Schema(description = "Optional Parameter to override configured parameters, such as the DID used or the HSM key used in singing the request object",

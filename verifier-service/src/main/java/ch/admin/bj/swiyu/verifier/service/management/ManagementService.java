@@ -110,9 +110,15 @@ public class ManagementService {
 
 
     private ResponseSpecification.ResponseSpecificationBuilder createResponseSpecificationBuilder(ResponseModeTypeDto responseMode) {
-        var responseModeType = responseMode == null ? ResponseModeType.DIRECT_POST : ManagementMapper.toResponseMode(responseMode);
+        // PQEID: Refuse unencrypted mode
+        if (ResponseModeTypeDto.DIRECT_POST.equals(responseMode)
+                && !applicationProperties.isAllowUnencryptedPresentations()) {
+            throw new IllegalArgumentException("response_mode direct_post (unencrypted) is disabled: use"
+                    + " direct_post.jwt, or set application.allow-unencrypted-presentations=true");
+        }
+        var responseModeType = responseMode == null ? ResponseModeType.DIRECT_POST_JWT : ManagementMapper.toResponseMode(responseMode);
         var responseSpecificationBuilder = ResponseSpecification.builder().responseModeType(responseModeType);
-        if (ResponseModeTypeDto.DIRECT_POST_JWT.equals(responseMode)) {
+        if (ResponseModeType.DIRECT_POST_JWT.equals(responseModeType)) {
             createEncryptionKeys(responseSpecificationBuilder);
         }
         return responseSpecificationBuilder;

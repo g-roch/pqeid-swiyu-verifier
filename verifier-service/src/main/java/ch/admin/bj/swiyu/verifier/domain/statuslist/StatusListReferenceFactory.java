@@ -1,5 +1,6 @@
 package ch.admin.bj.swiyu.verifier.domain.statuslist;
 
+import ch.admin.bj.swiyu.verifier.common.config.ApplicationProperties;
 import ch.admin.bj.swiyu.verifier.common.config.VerificationProperties;
 import ch.admin.bj.swiyu.verifier.common.util.json.JsonUtil;
 
@@ -20,6 +21,7 @@ import java.util.function.Function;
 @AllArgsConstructor
 @Slf4j
 public class StatusListReferenceFactory {
+    private final ApplicationProperties applicationProperties;
     private final IssuerPublicKeyLoader issuerPublicKeyLoader;
     private final StatusListResolverAdapter statusListResolverAdapter;
     private final VerificationProperties verificationProperties;
@@ -84,7 +86,8 @@ public class StatusListReferenceFactory {
     private Function<Map<String, Object>, List<TokenStatusListReference>> createTokenStatusListReferences(String referencedTokenIssuer) {
         return tokenStatusListReferenceTokenEntry -> List.of(
                 new TokenStatusListReference(statusListResolverAdapter, JsonUtil.getJsonObject(tokenStatusListReferenceTokenEntry.get("status_list")),
-                        issuerPublicKeyLoader, referencedTokenIssuer, verificationProperties.getObjectSizeLimit())
+                        issuerPublicKeyLoader, referencedTokenIssuer, verificationProperties.getObjectSizeLimit(),
+                        applicationProperties.acceptedSignatureJwsAlgorithms())
         );
     }
 

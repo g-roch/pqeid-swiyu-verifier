@@ -2,6 +2,7 @@ package ch.admin.bj.swiyu.verifier.infrastructure.health;
 
 
 import ch.admin.bj.swiyu.didresolveradapter.DidResolverException;
+import ch.admin.bj.swiyu.jwtutil.SignatureVerifiers;
 import ch.admin.bj.swiyu.verifier.common.config.ApplicationProperties;
 import ch.admin.bj.swiyu.verifier.service.JwtSigningService;
 import ch.admin.bj.swiyu.verifier.service.publickey.DidResolverFacade;
@@ -9,7 +10,6 @@ import ch.admin.eid.did_sidekicks.DidSidekicksException;
 import ch.admin.eid.did_sidekicks.Jwk;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.MLDSAVerifier;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -160,10 +160,10 @@ public class SigningKeyVerificationHealthChecker extends CachedHealthChecker {
         map.put("kid", jwk.getKid());
         map.put("pub", jwk.getPubKey());
         map.values().removeIf(java.util.Objects::isNull);
-        // Convert to ML-DSA public key
-        JWK publicKey = JWK.parse(map).toMLDSAKey();
-        // Create verifier and verify signature
-        JWSVerifier verifier = new MLDSAVerifier(publicKey.toMLDSAKey());
+        // PQEID: verifier from the DID key's type, gated by the verifier's own policy
+        JWK publicKey = JWK.parse(map);
+        JWSVerifier verifier = SignatureVerifiers.forKey(publicKey, signedJwt.getHeader().getAlgorithm(),
+                applicationProperties.acceptedSignatureJwsAlgorithms());
         return signedJwt.verify(verifier);
     }
 

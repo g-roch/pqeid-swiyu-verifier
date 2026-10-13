@@ -5,15 +5,16 @@ import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.crypto.CompositeSigner;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.jwk.CompositeMLDSAKey;
 import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.MLDSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import lombok.experimental.UtilityClass;
-
 import java.util.Date;
 
 /**
@@ -113,16 +114,17 @@ public class StatusListGenerator {
         if (key instanceof MLDSAKey mldsaKey) {
             return new MLDSASigner(mldsaKey);
         }
+        if (key instanceof CompositeMLDSAKey compositeKey) {
+            return new CompositeSigner(compositeKey);
+        }
         if (key instanceof ECKey ecKey) {
             return new ECDSASigner(ecKey);
         }
         throw new IllegalArgumentException("Unsupported key type: " + key.getKeyType());
     }
 
+    /** PQEID: the key's own algorithm (ML-DSA-44/65/87, composite); ES256 for legacy EC fixtures. */
     private static JWSAlgorithm algorithmFor(JWK key) {
-        if (key instanceof MLDSAKey) {
-            return JWSAlgorithm.ML_DSA_44;
-        }
-        return JWSAlgorithm.ES256;
+        return key.getAlgorithm() instanceof JWSAlgorithm alg ? alg : JWSAlgorithm.ES256;
     }
 }

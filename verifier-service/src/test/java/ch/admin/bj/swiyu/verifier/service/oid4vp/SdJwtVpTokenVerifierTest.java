@@ -19,6 +19,7 @@ import com.authlete.sd.SDObjectBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MLDSASigner;
+import com.nimbusds.jose.jwk.CompositeMLDSAKey;
 import com.nimbusds.jose.jwk.MLDSAKey;
 import com.nimbusds.jose.jwk.gen.MLDSAKeyGenerator;
 import com.nimbusds.jwt.JWTClaimsSet;
@@ -27,11 +28,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
 import java.security.NoSuchAlgorithmException;
 import java.text.ParseException;
 import java.util.*;
-
 import static ch.admin.bj.swiyu.verifier.common.exception.VerificationErrorResponseCode.HOLDER_BINDING_MISMATCH;
 import static ch.admin.bj.swiyu.verifier.service.oid4vp.test.mock.SDJWTCredentialMock.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -55,6 +54,14 @@ class SdJwtVpTokenVerifierTest {
 
     private SdJwtVpTokenVerifier verifier;
 
+    private static CompositeMLDSAKey compositeKey() throws Exception {
+        java.security.Security.addProvider(
+                com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton.getInstance());
+        var kp = java.security.KeyPairGenerator.getInstance("MLDSA65-ECDSA-P256-SHA512", "BC")
+                .generateKeyPair();
+        return CompositeMLDSAKey.fromJCA(kp.getPublic(), kp.getPrivate());
+    }
+
     @BeforeEach
     void setUp() throws LoadingPublicKeyOfIssuerFailedException, JOSEException {
         issuerPublicKeyLoader = mock(IssuerPublicKeyLoader.class);
@@ -67,14 +74,16 @@ class SdJwtVpTokenVerifierTest {
         when(applicationProperties.getClientId()).thenReturn("did:example:verifier");
         when(applicationProperties.getClientIdWithPrefix()).thenReturn("prefix:did:example:verifier");
         when(applicationProperties.getClientIdWithPrefix(any())).thenReturn("prefix:did:example:verifier");
+        when(applicationProperties.acceptedSignatureJwsAlgorithms())
+                .thenReturn(ch.admin.bj.swiyu.jwtutil.SignatureVerifiers.MIGRATION_DEFAULT);
         when(management.getId()).thenReturn(UUID.randomUUID());
         when(management.getAcceptedIssuerDids()).thenReturn(List.of(DEFAULT_ISSUER_ID));
         when(management.getTrustAnchors()).thenReturn(List.of());
         when(management.getRequestNonce()).thenReturn(TEST_NONCE);
         when(management.getConfigurationOverride()).thenReturn(new ConfigurationOverride(null, null, null, null, null, null));
 
-        when(issuerPublicKeyLoader.loadPublicKey(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE))
-                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
+        when(issuerPublicKeyLoader.loadJWK(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE))
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicJWK());
 
         // Status list verification is out of scope of this unit, so we simulate "no status entries"
         when(statusListReferenceFactory.createStatusListReferences(any(), any())).thenReturn(List.of());
@@ -87,8 +96,8 @@ class SdJwtVpTokenVerifierTest {
         // Arrange: VC issued by third party, not directly trusted via acceptedIssuerDids
         var vcIssuerDid = "did:example:third";
         var vcIssuerKid = vcIssuerDid + "#key-1";
-        when(issuerPublicKeyLoader.loadPublicKey(vcIssuerDid, vcIssuerKid))
-                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
+        when(issuerPublicKeyLoader.loadJWK(vcIssuerDid, vcIssuerKid))
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicJWK());
 
         var emulator = new SDJWTCredentialMock(vcIssuerDid, vcIssuerKid);
         var sdjwt = emulator.createSDJWTMock();
@@ -99,8 +108,8 @@ class SdJwtVpTokenVerifierTest {
         var trustRegistryUrl = "https://trust-registry.example.com";
         var trustIssuerDid = "did:example:trust";
         var trustIssuerKid = trustIssuerDid + "#key-1";
-        when(issuerPublicKeyLoader.loadPublicKey(trustIssuerDid, trustIssuerKid))
-                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
+        when(issuerPublicKeyLoader.loadJWK(trustIssuerDid, trustIssuerKid))
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicJWK());
 
         // Important: subject of trust statement must match vcIssuerDid so that isProvidingTrust() returns true
         var trustStatement = emulator.createTrustStatementIssuanceV1(trustIssuerDid, trustIssuerKid, vcIssuerDid);
@@ -125,8 +134,8 @@ class SdJwtVpTokenVerifierTest {
         var emulator = new SDJWTCredentialMock(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE);
         var sdjwt = emulator.createSDJWTMock();
 
-        when(issuerPublicKeyLoader.loadPublicKey(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE))
-                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicKey());
+        when(issuerPublicKeyLoader.loadJWK(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE))
+                .thenReturn(KeyFixtures.issuerMLDSAKey().toPublicJWK());
 
         // Audience intentionally mismatched
         var wrongAudience = "did:example:someone-else";
@@ -295,4 +304,55 @@ class SdJwtVpTokenVerifierTest {
         SdJwtVpTokenVerifier verifier = new SdJwtVpTokenVerifier(issuerPublicKeyLoader, statusListReferenceFactory, applicationProperties, verificationProperties);
         assertDoesNotThrow(() -> verifier.validateDisclosures(sdjwt, mgmtEntity));
     }
+
+    @Test
+    void verifyVpToken_compositeIssuerAndHolder_thenSucceeds() throws Exception {
+        // Arrange
+         var issuerKey = compositeKey();
+        var emulator = new SDJWTCredentialMock(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE,
+             issuerKey, compositeKey());
+        when(issuerPublicKeyLoader.loadJWK(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE))
+             .thenReturn(issuerKey.toPublicJWK());
+        var sdJwt = new SdJwt(emulator.addKeyBindingProof(emulator.createSDJWTMock(), TEST_NONCE,
+             applicationProperties.getClientIdWithPrefix()));
+
+        // Act
+        SdJwt verified = verifier.verifyVpTokenTrustStatement(sdJwt, management);
+
+        // Assert
+        assertEquals(JWSAlgorithm.ML_DSA_65_ES256, verified.getHeader().getAlgorithm());
+        }
+
+         /** The holder chooses the cnf key: an algorithm outside the policy must be refused. */
+        @Test
+        void verifyVpToken_holderKeyOutsidePolicy_thenHolderBindingMismatch() throws Exception {
+                // Arrange
+                var holder87 = new MLDSAKeyGenerator(JWSAlgorithm.ML_DSA_87).generate();
+                var emulator = new SDJWTCredentialMock(DEFAULT_ISSUER_ID, DEFAULT_KID_HEADER_VALUE,
+                        KeyFixtures.issuerMLDSAKey(), holder87);
+                var sdJwt = new SdJwt(emulator.addKeyBindingProof(emulator.createSDJWTMock(), TEST_NONCE,
+                        applicationProperties.getClientIdWithPrefix()));
+
+                // Act
+                VerificationException ex = assertThrows(VerificationException.class,
+                        () -> verifier.verifyVpTokenTrustStatement(sdJwt, management));
+
+                // Assert
+                assertEquals(HOLDER_BINDING_MISMATCH, ex.getErrorResponseCode());
+        }
+
+         /** Contract phase: refusing non-hybrid is a configuration change. */
+        @Test
+        void verifyVpToken_contractPolicy_rejectsMldsa44Credential() throws Exception {
+                // Arrange
+                when(applicationProperties.acceptedSignatureJwsAlgorithms())
+                        .thenReturn(java.util.Set.of(JWSAlgorithm.ML_DSA_65_ES256));
+                var emulator = new SDJWTCredentialMock();
+                var sdJwt = new SdJwt(emulator.addKeyBindingProof(emulator.createSDJWTMock(), TEST_NONCE,
+                        applicationProperties.getClientIdWithPrefix()));
+
+                // Act / Assert
+                assertThrows(VerificationException.class,
+                        () -> verifier.verifyVpTokenTrustStatement(sdJwt, management));
+        }
 }

@@ -7,6 +7,8 @@ import com.authlete.sd.SDObjectBuilder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.*;
+import com.nimbusds.jose.crypto.CompositeSigner;
+import com.nimbusds.jose.jwk.CompositeMLDSAKey;
 import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jose.crypto.MLDSASigner;
 import com.nimbusds.jose.jwk.ECKey;
@@ -42,7 +44,7 @@ public class SDJWTCredentialMock {
     private final String kidHeaderValue;
 
     // PQEID: ECDSA -> ML-DSA. Defaults to ML-DSA now that's the real supported algorithm
-    // (see SdJwtVpTokenVerifier.SUPPORTED_JWT_ALGORITHMS) - callers that specifically need EC
+    // (see ApplicationProperties.acceptedSignatureAlgorithms) - callers that specifically need EC
     // output (eg. tests exercising the did_sidekicks DID-resolution path, which cannot carry
     // ML-DSA keys, see pqeid-mldsa-did-resolver-blocker) pass KeyFixtures.issuerKey()/
     // holderKey() explicitly via the JWK-typed constructors below.
@@ -73,6 +75,9 @@ public class SDJWTCredentialMock {
         if (key instanceof MLDSAKey mldsaKey) {
             return new MLDSASigner(mldsaKey);
         }
+        if (key instanceof CompositeMLDSAKey compositeKey) {
+            return new CompositeSigner(compositeKey);
+        }
         if (key instanceof ECKey ecKey) {
             return new ECDSASigner(ecKey);
         }
@@ -80,14 +85,10 @@ public class SDJWTCredentialMock {
     }
 
     /**
-     * PQEID: matching JWSAlgorithm for the given key, used as the default when callers don't
-     * explicitly pass one (eg. via createSDJWTMockWithRecursiveListArray()).
+     * PQEID: the key's own algorithm (ML-DSA-44/65/87, composite); ES256 for legacy EC fixtures.
      */
     private static JWSAlgorithm algorithmFor(JWK key) {
-        if (key instanceof MLDSAKey) {
-            return JWSAlgorithm.ML_DSA_44;
-        }
-        return JWSAlgorithm.ES256;
+        return key.getAlgorithm() instanceof JWSAlgorithm alg ? alg : JWSAlgorithm.ES256;
     }
 
     /**

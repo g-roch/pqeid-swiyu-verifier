@@ -1,11 +1,12 @@
 package ch.admin.bj.swiyu.verifier.dto.metadata;
 
-import com.nimbusds.jose.JWSAlgorithm;
-import jakarta.validation.ConstraintValidator;
-import jakarta.validation.ConstraintValidatorContext;
-
 import java.util.HashSet;
 import java.util.List;
+
+import com.nimbusds.jose.JWSAlgorithm;
+
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
 
 public class ValidJwtValuesValidator implements ConstraintValidator<ValidJwtValues, List<String>> {
     @Override
@@ -15,7 +16,7 @@ public class ValidJwtValuesValidator implements ConstraintValidator<ValidJwtValu
             return false;
         }
 
-        // PQEID: ECDSA -> ML-DSA. Could be more in the future, but for now we only support ML-DSA-44
+        // PQEID: currently UNUSED (its only user, OpenIdClientMetadataVpFormat, is referenced nowhere
         var validAlgsList = List.of(JWSAlgorithm.ML_DSA_44);
 
         var validAlgorithms = new HashSet<>(validAlgsList.stream().map(JWSAlgorithm::getName).toList());

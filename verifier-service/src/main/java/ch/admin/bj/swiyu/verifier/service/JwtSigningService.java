@@ -6,6 +6,7 @@ import ch.admin.bj.swiyu.verifier.common.config.ApplicationProperties;
 import ch.admin.bj.swiyu.verifier.common.config.SignatureConfiguration;
 import ch.admin.bj.swiyu.verifier.common.profile.SwissProfileVersions;
 import ch.admin.bj.swiyu.verifier.common.util.SignerProvider;
+import ch.admin.bj.swiyu.jwssignatureservice.SignerAlgorithm;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JOSEObjectType;
@@ -13,6 +14,7 @@ import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.jose.JWSSigner;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -59,7 +61,8 @@ public class JwtSigningService {
 
         // Build the JAR header with the required swiss profile version indication.
         // PQEID: ECDSA -> ML-DSA
-        JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.ML_DSA_44)
+        JWSSigner signer = signerProvider.getSigner();
+        JWSHeader header = new JWSHeader.Builder(SignerAlgorithm.of(signer))
                 .keyID(verificationMethod)
                 .type(new JOSEObjectType(OAUTH_AUTHZ_REQ_JWT))
                 .customParam(SwissProfileVersions.PROFILE_VERSION_PARAM, SwissProfileVersions.VERIFICATION_PROFILE_VERSION)

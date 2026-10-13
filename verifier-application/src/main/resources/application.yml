@@ -17,6 +17,8 @@ application:
   key-management-method: "${SIGNING_KEY_MANAGEMENT_METHOD:key}"
   max-compressed-cipher-text-length: ${MAX_COMPRESSED_CIPHER_TEXT_LENGTH:100000}
   max-vcs-accepted: 1 # At the moment the default value is set to 1 as the dcql multiple flag is not fully supported
+  allow-unencrypted-presentations: ${ALLOW_UNENCRYPTED_PRESENTATIONS:false} # PQEID: direct_post refused unless true
+  accepted-signature-algorithms: ${ACCEPTED_SIGNATURE_ALGORITHMS:ML-DSA-44,ML-DSA-65-ES256} # PQEID: contract = drop ML-DSA-44
   # Pin to unlock the hsm
   hsm:
     user-pin: "${secret.key.hsm.pin.user:${HSM_USER_PIN:}}"

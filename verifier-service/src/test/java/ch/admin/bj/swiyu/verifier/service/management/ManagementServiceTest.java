@@ -1,6 +1,7 @@
 package ch.admin.bj.swiyu.verifier.service.management;
 
 import ch.admin.bj.swiyu.verifier.dto.management.CreateVerificationManagementDto;
+import ch.admin.bj.swiyu.verifier.domain.management.ResponseModeType;
 import ch.admin.bj.swiyu.verifier.dto.management.ResponseModeTypeDto;
 import ch.admin.bj.swiyu.verifier.dto.management.dcql.DcqlQueryDto;
 import ch.admin.bj.swiyu.verifier.common.config.ApplicationProperties;
@@ -50,6 +51,8 @@ class ManagementServiceTest {
 
     @Test
     void createVerificationManagementDcql_thenSuccess() {
+        // clear mode on purpose: this test is about DCQL; direct_post must be explicitly allowed (1c)
+        when(applicationProperties.isAllowUnencryptedPresentations()).thenReturn(true);
         var dcqlQueryDto = mock(DcqlQueryDto.class);
         var dcqlQuery = mock(DcqlQuery.class);
         CreateVerificationManagementDto requestDto = new CreateVerificationManagementDto(
@@ -158,6 +161,7 @@ class ManagementServiceTest {
         try (MockedStatic<ManagementMapper> managementMapper = mockStatic(ManagementMapper.class)) {
             managementMapper.when(() -> ManagementMapper.toManagementResponseDto(any(Management.class), any()))
                     .thenReturn(mock(ch.admin.bj.swiyu.verifier.dto.management.ManagementResponseDto.class));
+            managementMapper.when(() -> ManagementMapper.toResponseMode(any())).thenCallRealMethod();
             try (MockedStatic<DcqlMapper> dcqlMapper = mockStatic(DcqlMapper.class)) {
                 dcqlMapper.when(() -> DcqlMapper.toDcqlQuery(any(DcqlQueryDto.class)))
                         .thenReturn(dcqlQuery);
@@ -199,5 +203,45 @@ class ManagementServiceTest {
             assertEquals("Test", parsedJWE.getPayload().toString());
         }
 
+    }
+
+    // PQEID: Test that a request without mode produce DIRECT_POSE_JWT with keys
+    @Test
+    void createManagementWithoutResponseMode_defaultsToDirectPostJwtWithKeys() {
+        var dcqlQueryDto = mock(DcqlQueryDto.class);
+        CreateVerificationManagementDto requestDto = new CreateVerificationManagementDto(
+                List.of("did:example:123"), null, false,
+                null,                                   // no response_mode -> must default to direct_post.jwt
+                null, dcqlQueryDto, null);
+        var managementCaptor = ArgumentCaptor.forClass(Management.class);
+        when(repository.save(any(Management.class))).thenReturn(mock(Management.class));
+
+        try (MockedStatic<ManagementMapper> managementMapper = mockStatic(ManagementMapper.class)) {
+            managementMapper.when(() -> ManagementMapper.toManagementResponseDto(any(Management.class), any()))
+                    .thenReturn(mock(ch.admin.bj.swiyu.verifier.dto.management.ManagementResponseDto.class));
+            try (MockedStatic<DcqlMapper> dcqlMapper = mockStatic(DcqlMapper.class)) {
+                dcqlMapper.when(() -> DcqlMapper.toDcqlQuery(any(DcqlQueryDto.class))).thenReturn(mock(DcqlQuery.class));
+                service.createVerificationManagement(requestDto);
+            }
+        }
+
+        verify(repository).save(managementCaptor.capture());
+        var responseSpec = managementCaptor.getValue().getResponseSpecification();
+        assertThat(responseSpec.getResponseModeType()).isEqualTo(ResponseModeType.DIRECT_POST_JWT);
+        assertThat(responseSpec.getJwks()).isNotEmpty();
+        assertThat(responseSpec.getJwksPrivate()).isNotEmpty();
+    } 
+    // PQEID: Test that prove refusal of unencrypted mode
+    @Test
+    void createManagementWithDirectPost_whenNotAllowed_thenRejected() {
+        CreateVerificationManagementDto requestDto = new CreateVerificationManagementDto(
+                List.of("did:example:123"), null, false,
+                ResponseModeTypeDto.DIRECT_POST,         // explicitly unencrypted
+                null, mock(DcqlQueryDto.class), null);
+        // applicationProperties is a plain mock: isAllowUnencryptedPresentations() returns false
+
+        var ex = assertThrows(IllegalArgumentException.class, () -> service.createVerificationManagement(requestDto));
+        assertThat(ex.getMessage()).contains("direct_post");
+        verify(repository, never()).save(any(Management.class));   // nothing stored
     }
 }

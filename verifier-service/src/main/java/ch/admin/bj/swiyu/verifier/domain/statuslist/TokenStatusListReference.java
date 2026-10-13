@@ -1,27 +1,27 @@
 package ch.admin.bj.swiyu.verifier.domain.statuslist;
 
+import java.io.IOException;
+import java.text.ParseException;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSVerifier;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
+import com.nimbusds.jwt.proc.BadJWTException;
+import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
+
+import ch.admin.bj.swiyu.jwtutil.SignatureVerifiers;
 import ch.admin.bj.swiyu.verifier.common.exception.VerificationErrorResponseCode;
 import ch.admin.bj.swiyu.verifier.common.exception.VerificationException;
 import ch.admin.bj.swiyu.verifier.common.util.json.JsonUtil;
 import ch.admin.bj.swiyu.verifier.service.publickey.IssuerPublicKeyLoader;
 import ch.admin.bj.swiyu.verifier.service.publickey.LoadingPublicKeyOfIssuerFailedException;
 import ch.admin.bj.swiyu.verifier.service.statuslist.StatusListResolverAdapter;
-import com.nimbusds.jose.JOSEException;
-import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.MLDSAVerifier;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import com.nimbusds.jwt.proc.BadJWTException;
-import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import lombok.extern.slf4j.Slf4j;
-import org.bouncycastle.jcajce.interfaces.MLDSAPublicKey;
-
-import java.io.IOException;
-import java.security.PublicKey;
-import java.text.ParseException;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 
 /**
@@ -39,18 +39,13 @@ import java.util.Set;
  */
 @Slf4j
 class TokenStatusListReference extends StatusListReference {
+     private final Set<JWSAlgorithm> acceptedAlgorithms;
 
-
-    public TokenStatusListReference(StatusListResolverAdapter adapter, Map<String, Object> statusListReferenceClaims, IssuerPublicKeyLoader issuerPublicKeyLoader, String referencedTokenIssuer, int maxBufferSize) {
+    public TokenStatusListReference(StatusListResolverAdapter adapter, Map<String, Object> statusListReferenceClaims,
+         IssuerPublicKeyLoader issuerPublicKeyLoader, String referencedTokenIssuer, 
+         int maxBufferSize, Set<JWSAlgorithm> acceptedAlgorithms) {
         super(adapter, statusListReferenceClaims, issuerPublicKeyLoader, referencedTokenIssuer, maxBufferSize);
-    }
-
-    // PQEID: ECDSA -> ML-DSA
-    private static JWSVerifier toJwsVerifier(PublicKey publicKey) throws JOSEException {
-        if (publicKey instanceof MLDSAPublicKey mldsaPublicKey) {
-            return new MLDSAVerifier(mldsaPublicKey);
-        }
-        throw new IllegalArgumentException("Unsupported public key type: " + publicKey.getClass().getName());
+        this.acceptedAlgorithms = acceptedAlgorithms;
     }
 
     /**
@@ -180,8 +175,11 @@ class TokenStatusListReference extends StatusListReference {
                     Set.of("iss")
             ).verify(vc.getJWTClaimsSet(), null);
             var issuer = vc.getJWTClaimsSet().getIssuer();
-            var publicKey = getIssuerPublicKeyLoader().loadPublicKey(issuer, vc.getHeader().getKeyID());
-            if (!vc.verify(toJwsVerifier(publicKey))) {
+                        var issuerJwk = getIssuerPublicKeyLoader().loadJWK(issuer, vc.getHeader().getKeyID());
+            // PQEID: verifier from key type, gated by the verifier's policy
+            JWSVerifier verifier = SignatureVerifiers.forKey(issuerJwk, vc.getHeader().getAlgorithm(),
+                    acceptedAlgorithms);
+            if (!vc.verify(verifier)) {
                 throw statusListError("Failed to verify JWT: Issuer public key does not match signature!");
             }
         } catch (LoadingPublicKeyOfIssuerFailedException | ParseException | JOSEException |

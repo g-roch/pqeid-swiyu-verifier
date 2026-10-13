@@ -1,5 +1,7 @@
 package ch.admin.bj.swiyu.verifier.service.oid4vp;
 
+import ch.admin.bj.swiyu.jwtutil.SignatureVerifiers;
+import ch.admin.bj.swiyu.jwtutil.JwtUtilException;
 import ch.admin.bj.swiyu.verifier.common.config.ApplicationProperties;
 import ch.admin.bj.swiyu.verifier.common.config.VerificationProperties;
 import ch.admin.bj.swiyu.verifier.common.exception.VerificationException;
@@ -17,10 +19,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.crypto.MLDSAVerifier;
-import com.nimbusds.jose.crypto.factories.DefaultJWSVerifierFactory;
+import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
@@ -55,8 +57,6 @@ public class SdJwtVpTokenVerifier {
     // We have vc+sd-jwt only for legacy reasons (Expand-Migrate-Contract: removal tracked in a separate Contract-phase ticket).
     // Spec: https://datatracker.ietf.org/doc/html/draft-ietf-oauth-sd-jwt-vc-09#name-application-dcsd-jwt
     public static final List<String> SUPPORTED_CREDENTIAL_FORMATS = List.of("vc+sd-jwt", "dc+sd-jwt");
-    // PQEID: ECDSA -> ML-DSA
-    public static final List<String> SUPPORTED_JWT_ALGORITHMS = List.of("ML-DSA-44");
     public static final List<String> SUPPORTED_SDJWT_ALGORITHMS = List.of("sha-256");
     public static final String SDJWT_ALG_CLAIM = "_sd_alg";
 
@@ -97,10 +97,12 @@ public class SdJwtVpTokenVerifier {
             validateHeader(header);
             var claims = nimbusJwt.getJWTClaimsSet();
             // Only technical verification here; issuer trust is validated at service layer
-            var publicKey = issuerPublicKeyLoader.loadPublicKey(claims.getIssuer(), header.getKeyID());
+            var issuerJwk = issuerPublicKeyLoader.loadJWK(claims.getIssuer(), header.getKeyID());
             log.trace("Loaded issuer public key for id {}", managementEntity.getId());
-            // Verify the JWS signature of the JWT
-            if (!nimbusJwt.verify(new DefaultJWSVerifierFactory().createJWSVerifier(header, publicKey))) {
+            // Verify the JWS signature of the JWT (PQEID: verifier from key type + policy)
+            JWSVerifier issuerVerifier = SignatureVerifiers.forKey(issuerJwk, header.getAlgorithm(),
+                    applicationProperties.acceptedSignatureJwsAlgorithms());
+            if (!nimbusJwt.verify(issuerVerifier)) {
                 throw credentialError(MALFORMED_CREDENTIAL, "Signature mismatch");
             }
             log.trace("Successfully verified signature of id {}", managementEntity.getId());
@@ -109,6 +111,8 @@ public class SdJwtVpTokenVerifier {
             sdJwt.setClaims(claims);
         } catch (ParseException e) {
             throw credentialError(MALFORMED_CREDENTIAL, "Failed to extract information from JWT token");
+        } catch (JwtUtilException e) {
+            throw credentialError(e, MALFORMED_CREDENTIAL, "Issuer key/algorithm not acceptable: " + e.getMessage());
         } catch (LoadingPublicKeyOfIssuerFailedException | JOSEException e) {
             throw credentialError(e, PUBLIC_KEY_OF_ISSUER_UNRESOLVABLE, e.getMessage());
         }
@@ -150,9 +154,10 @@ public class SdJwtVpTokenVerifier {
      * @param header A header to be validated
      */
     protected void validateHeader(JWSHeader header) {
-        if (header.getAlgorithm() == null || !SUPPORTED_JWT_ALGORITHMS.contains(header.getAlgorithm().getName())) {
+        var accepted = applicationProperties.acceptedSignatureJwsAlgorithms();
+        if (header.getAlgorithm() == null || !accepted.contains(header.getAlgorithm())) {
             throw credentialError(INVALID_FORMAT, "Invalid Algorithm: alg is not supported must be one of %s, but was %s"
-                    .formatted(SUPPORTED_JWT_ALGORITHMS, header.getAlgorithm().getName()));
+                    .formatted(accepted, header.getAlgorithm()));
         }
         if (!SUPPORTED_CREDENTIAL_FORMATS.contains(header.getType().getType())) {
             throw credentialError(INVALID_FORMAT, "Type header must be one of %s".formatted(SUPPORTED_CREDENTIAL_FORMATS));
@@ -213,8 +218,10 @@ public class SdJwtVpTokenVerifier {
             SignedJWT keyBindingJWT = SignedJWT.parse(keyBindingProof);
 
             validateKeyBindingHeader(keyBindingJWT.getHeader());
-
-            if (!keyBindingJWT.verify(new MLDSAVerifier(keyBinding.toMLDSAKey()))) {
+            JWSVerifier holderVerifier = SignatureVerifiers.forKey(keyBinding,
+                    keyBindingJWT.getHeader().getAlgorithm(),
+                    applicationProperties.acceptedSignatureJwsAlgorithms());
+            if (!keyBindingJWT.verify(holderVerifier)) {
                 throw credentialError(HOLDER_BINDING_MISMATCH, "Holder Binding provided does not match the one in the credential");
             }
             validateKeyBindingClaims(keyBindingJWT);
@@ -223,9 +230,11 @@ public class SdJwtVpTokenVerifier {
         } catch (ParseException e) {
             throw credentialError(e, HOLDER_BINDING_MISMATCH, "Holder Binding could not be parsed");
         } catch (JOSEException e) {
-            throw credentialError(e, HOLDER_BINDING_MISMATCH, "Failed to verify the holder key binding - only supporting ML-DSA Keys");
+            throw credentialError(e, HOLDER_BINDING_MISMATCH, "Failed to verify the holder key binding");
         } catch (BadJWTException e) {
             throw credentialError(e, HOLDER_BINDING_MISMATCH, "Holder Binding is not a valid JWT");
+        } catch (JwtUtilException e) {
+            throw credentialError(e, HOLDER_BINDING_MISMATCH, "Holder key/algorithm not acceptable: " + e.getMessage());
         }
         return keyBindingClaims;
     }
@@ -277,8 +286,9 @@ public class SdJwtVpTokenVerifier {
                             keyBindingHeader.getType()));
         }
 
-        if (!SUPPORTED_JWT_ALGORITHMS.contains(keyBindingHeader.getAlgorithm().getName())) {
-            throw credentialError(HOLDER_BINDING_MISMATCH, "Holder binding algorithm must be in %s".formatted(SUPPORTED_CREDENTIAL_FORMATS));
+        var accepted = applicationProperties.acceptedSignatureJwsAlgorithms();
+        if (!accepted.contains(keyBindingHeader.getAlgorithm())) {
+            throw credentialError(HOLDER_BINDING_MISMATCH, "Holder binding algorithm must be in %s".formatted(accepted));
         }
     }
 
